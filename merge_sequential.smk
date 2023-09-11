@@ -4,28 +4,25 @@ import functools
 
 # ----------------------------------------------------------------------------------- #
 # SCRIPT DESCRIPTION:
-# This Snakemake script processes VCF files by first splitting them into manageable
-# subsets, then merging them, and finally creating a single merged VCF file.
-# The script uses `bcftools` for VCF processing.
-# based on the idea here: https://shicheng-guo.github.io/bioinformatics/1923/02/28/bcftools-merge
-# bcftools seems to only handle up to 1021 files at a time, so we need to split the files
+# This Snakemake script orchestrates a pipeline to manage large sets of VCF files.
+# It splits a large number of VCF files into smaller subsets, merges them in batches, 
+# and then merges all batches into a single VCF file. `bcftools` is utilized for 
+# VCF processing tasks, which has a limitation of handling up to 1021 files at a time.
+# Reference: https://shicheng-guo.github.io/bioinformatics/1923/02/28/bcftools-merge
 # ----------------------------------------------------------------------------------- #
-
-# Read the configuration file
-configfile: "config.yaml"
 
 # ----------------------------------------------------------------------------------- #
 # ENVIRONMENT SETUP:
-# Define temporary directory using an environment variable 
-# (usually set by the cluster scheduler)
+# Define the temporary directory using an environment variable typically set by
+# the cluster scheduler.
 SCRATCH_DIR = os.environ.get('TMPDIR')
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
 # CONFIGURATION:
-# Extract user-defined input and output directories from the configuration.
-# VCFS_PER_BATCH determines how many VCFs are processed in each batch.
-# CONDA_ENV specifies the Conda environment to be used.
+# Extract the necessary parameters from the configuration file, including input 
+# directory, batch size for VCF processing, and the Conda environment to be used.
+configfile: "config.yaml"
 INPUT_DIR = config["vcf_folder"]
 VCFS_PER_BATCH = config["vcfs_per_batch"]
 CONDA_ENV = config["conda_env"]
@@ -65,17 +62,22 @@ needed_number_of_subsets = -(-total_vcfs // VCFS_PER_BATCH)  # Ceiling division.
 
 # ----------------------------------------------------------------------------------- #
 # PIPELINE RULES:
-# TODO: fix logging (currently it overwrites amd the run rules dont work)
-# TODO: add md5sum calculation for all input, intermediate and output files
-# TODO: remove intermediate files
-# TODO: make sure that the index is created after the vcf file
+# Define the rules for the Snakemake pipeline, guiding the workflow through various 
+# stages including splitting, merging, and creating a list of merged VCF files.
+# Each rule has clearly defined inputs, outputs, and log files to maintain a structured
+# workflow.
+# TODO:
+# - Implement md5sum calculation for all files to verify data integrity.
+# - Remove intermediate files to save storage space.
+# - Ensure proper sequence of index and VCF file creation to maintain organization.
 
-# Rule to find all .vcf.gz files and initiate the pipeline.
+# Rule to initiate the pipeline with the final merged VCF file as the target output.
 rule all:
     input:
         os.path.join(FINAL_DIR, "all_merged.vcf.gz")
 
-# Rule to split the vcf files into subsets.
+# Rule to split the VCF files into smaller subsets for batch processing. It uses 
+# Python's datetime module to log the start and end times of the process.
 rule split_vcfs:
     input:
         vcf_files=glob.glob("{}/{}.vcf.gz".format(INPUT_DIR, '*'))
@@ -99,7 +101,8 @@ rule split_vcfs:
         with open(log[0], 'a') as log_file:
             log_file.write(f"Finished split_vcfs at: {datetime.now()}\n")
 
-# Rule to merge the vcf files based on subsets.
+# Rule to merge the VCF files based on the subsets created in the previous rule, using
+# bcftools for the merging process.
 rule merge_vcfs:
     input:
         os.path.join(LISTS_DIR, "subset_vcfs.{idx}")
@@ -117,12 +120,12 @@ rule merge_vcfs:
     shell:
         """
         echo "Starting merge_vcfs at: $(date)" >> {log}
-        bcftools merge --threads {threads} -0 -l {input} -Oz -o {output} &> {log}
-        bcftools index --threads {threads} -t {output} &> {log}
+        bcftools merge --threads {threads} -0 -l {input} -Oz -o {output} &>> {log}
+        bcftools index --threads {threads} -t {output} &>> {log}
         echo "Finished merge_vcfs at: $(date)" >> {log}
         """
 
-# Rule to create a list of all merged vcf files.
+# Rule to create a list of all the merged VCF files, aiding in the final merging process.
 rule list_merged_vcfs:
     input:
         merged_files=expand(os.path.join(MERGE_DIR, "merge.{idx}.vcf.gz"), idx=range(needed_number_of_subsets))
@@ -146,7 +149,8 @@ rule list_merged_vcfs:
             log_file.write(f"Finished list_merged_vcfs at: {datetime.now()}\n")
 
 
-# Rule to merge all merged vcf files into one final file.
+# Rule to merge all the intermediate merged VCF files into a single final VCF file using 
+# bcftools, marking the end of the pipeline.
 rule final_merge:
     input:
         os.path.join(LISTS_DIR, "merge.txt")
@@ -164,8 +168,8 @@ rule final_merge:
     shell:
         """
         echo "Starting final_merge at: $(date)" >> {log}
-        bcftools merge --threads {threads} -l {input} -0 -Oz -o {output} &> {log}
-        bcftools index --threads {threads} -t {output} &> {log}
+        bcftools merge --threads {threads} -l {input} -0 -Oz -o {output} &>> {log}
+        bcftools index --threads {threads} -t {output} &>> {log}
         echo "Finished final_merge at: $(date)" >> {log}
         """
 # ----------------------------------------------------------------------------------- #

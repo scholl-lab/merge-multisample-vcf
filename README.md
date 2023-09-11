@@ -7,7 +7,7 @@ This repository contains a pipeline designed to process VCF files by splitting t
 ## Contents
 
 - `merge_sequential.smk`: The main Snakemake script for the pipeline.
-- `config.yaml`: Configuration file that stores parameters and settings for the pipeline.
+- `config_dummy.yaml`: Configuration file dummy that stores parameters and settings for the pipeline.
 - `run_merge_sequential.sh`: A scheduler shell script to run the Snakemake pipeline on a Slurm scheduler.
 
 ## Setup
@@ -52,6 +52,19 @@ sbatch run_merge_sequential.sh
 
 The script sets up necessary temporary directories, logs, and other parameters before invoking Snakemake. The logs for the Snakemake jobs are saved in the `slurm_logs` directory.
 
-## Output
+## Logging
 
-The pipeline will generate merged VCF files, with intermediate lists and logs saved in subdirectories defined in the `config.yaml`.
+The script logs the start and end times of each rule to facilitate performance profiling and troubleshooting. Log files are stored in the directory specified under `log_subfolder` in the configuration file.
+
+## Contribution
+
+Feel free to fork the repository and submit pull requests for any enhancements or bug fixes. Contributions to improve the script or documentation are welcome.
+
+## TODO
+
+- Implement md5sum calculation for all files to verify data integrity.
+- Remove intermediate files to save storage space.
+- Ensure proper sequence of index and VCF file creation to maintain organization.
+- Add error handling to manage potential issues gracefully, such as missing input files or unsuccessful command executions.
+- Consider making the file extensions configurable to allow for more flexible input.
+- Explore options for dynamic memory allocation based on the number of threads, possibly through a configuration setting or automatic calculation.
