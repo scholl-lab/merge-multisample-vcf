@@ -100,7 +100,7 @@ rule merge_gvcfs:
           -R {REFERENCE_GENOME} \
           -O {output} \
           -G StandardAnnotation -G AS_StandardAnnotation \
-          -V {input}
+          -V {input} &>> {log}
         echo "Finished merge_gvcfs at: $(date)" >> {log}
         """
 
@@ -137,7 +137,7 @@ rule final_merge:
           -R {REFERENCE_GENOME} \
           -O {output} \
           -G StandardAnnotation -G AS_StandardAnnotation \
-          -V {input}
+          -V {input} &>> {log}
         echo "Finished final_merge at: $(date)" >> {log}
         """
 # ----------------------------------------------------------------------------------- #
