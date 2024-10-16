@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#SBATCH --job-name=merge_gvcf_pipeline
+#SBATCH --job-name=reblock_genomicsdb_gatk_pipeline
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --time=168:00:00
@@ -22,5 +22,5 @@ mkdir -p slurm_logs
 export SBATCH_DEFAULTS=" --output=slurm_logs/%x-%j.log"
 
 date
-srun snakemake -s merge_gvcf_pipeline.smk --use-conda --profile=cubi-v1 -j100
+srun snakemake -s reblock_genomicsdb_gatk_pipeline.smk --use-conda --profile=cubi-v1 -j250
 date

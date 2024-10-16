@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-#SBATCH --job-name=sm_merge_sequential_main_job
+#SBATCH --job-name=merge_sequential
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --time=168:00:00
