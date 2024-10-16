@@ -17,11 +17,10 @@ SCRATCH_DIR = os.environ.get('TMPDIR', '/tmp')
 # ----------------------------------------------------------------------------------- #
 # CONFIGURATION:
 # Extract the necessary parameters from the configuration file, including input 
-# file, the Conda environment to be used.
+# file, the Conda environments to be used.
 configfile: "config.yaml"
 INPUT_FILE = config["gvcf_list_file"]
 GATK_ENV = config["gatk_env"]
-BCFTOOLS_ENV = config["bcftools_env"]
 REFERENCE_GENOME = config["reference_genome"]
 # ----------------------------------------------------------------------------------- #
 
@@ -45,11 +44,11 @@ for output_dir in [LISTS_DIR, REBLOCK_DIR, GENOMICS_DB_DIR, FINAL_DIR, LOG_DIR]:
 with open(INPUT_FILE, 'r') as f:
     gvcf_list = [line.strip() for line in f if line.strip()]
 
-# Create a mapping from indices to GVCF file paths.
-gvcf_dict = { idx: filepath for idx, filepath in enumerate(gvcf_list) }
+# Extract sample names from the basenames of the input files.
+samples = [os.path.basename(f).replace('.g.vcf.gz', '') for f in gvcf_list]
 
-# Total number of GVCF files.
-NUM_GVCFS = len(gvcf_list)
+# Create a mapping from sample names to GVCF file paths.
+sample_to_gvcf = dict(zip(samples, gvcf_list))
 # ----------------------------------------------------------------------------------- #
 
 
@@ -62,16 +61,20 @@ NUM_GVCFS = len(gvcf_list)
 # Rule to initiate the pipeline with the final merged GVCF file as the target output.
 rule all:
     input:
-        os.path.join(FINAL_DIR, "selected_variants.g.vcf.gz")
+        # Final output
+        os.path.join(FINAL_DIR, "selected_variants.g.vcf.gz"),
+        # Sample map file
+        os.path.join(LISTS_DIR, "all_samples.sample_map")
 
-# Rule to reblock the GVCF files.
+# Rule to reblock the GVCF files and create sample map entries.
 rule reblock_gvcfs:
     input:
-        gvcf=lambda wildcards: gvcf_dict[int(wildcards.idx)]
+        gvcf=lambda wildcards: sample_to_gvcf[wildcards.sample]
     output:
-        reblocked_gvcf=os.path.join(REBLOCK_DIR, "{idx}.rb.g.vcf.gz")
+        reblocked_gvcf=os.path.join(REBLOCK_DIR, "{sample}.rb.g.vcf.gz"),
+        sample_map_entry=os.path.join(LISTS_DIR, "{sample}.sample_map")
     log:
-        os.path.join(LOG_DIR, "reblock_gvcf.{idx}.log")
+        os.path.join(LOG_DIR, "reblock_gvcf.{sample}.log")
     threads: 2
     resources:
         mem_mb = 8000,
@@ -87,39 +90,25 @@ rule reblock_gvcfs:
           -R {REFERENCE_GENOME} \
           -V {input.gvcf} \
           -O {output.reblocked_gvcf} &>> {log}
+        
+        # Extract sample name from the reblocked GVCF
+        sample_name=$(zcat {output.reblocked_gvcf} | grep "^#CHROM" | cut -f10)
+        echo -e "$sample_name\t{output.reblocked_gvcf}" > {output.sample_map_entry}
+        
         echo "Finished ReblockGVCF at: $(date)" >> {log}
-        """
-
-# Rule to get the sample name from the reblocked GVCF and write a sample map file.
-rule get_sample_name:
-    input:
-        reblocked_gvcf=os.path.join(REBLOCK_DIR, "{idx}.rb.g.vcf.gz")
-    output:
-        sample_map=os.path.join(LISTS_DIR, "{idx}.sample_map")
-    log:
-        os.path.join(LOG_DIR, "get_sample_name.{idx}.log")
-    conda:
-        BCFTOOLS_ENV
-    shell:
-        """
-        set -e
-        echo "Starting get_sample_name at: $(date)" > {log}
-        sample_name=$(bcftools query -l {input.reblocked_gvcf})
-        echo -e "$sample_name\t{input.reblocked_gvcf}" > {output.sample_map}
-        echo "Finished get_sample_name at: $(date)" >> {log}
         """
 
 # Rule to create a sample map for all reblocked GVCF files.
 rule create_sample_map:
     input:
-        sample_maps=expand(os.path.join(LISTS_DIR, "{idx}.sample_map"), idx=range(NUM_GVCFS))
+        sample_map_entries=expand(os.path.join(LISTS_DIR, "{sample}.sample_map"), sample=samples)
     output:
         os.path.join(LISTS_DIR, "all_samples.sample_map")
     log:
         os.path.join(LOG_DIR, "create_sample_map.log")
     run:
         with open(output[0], 'w') as outfile:
-            for sample_map_file in input.sample_maps:
+            for sample_map_file in input.sample_map_entries:
                 with open(sample_map_file, 'r') as infile:
                     outfile.write(infile.read())
 
@@ -147,7 +136,7 @@ rule genomicsdb_import:
           --genomicsdb-workspace-path {output.db} \
           --tmp-dir {resources.tmpdir} \
           --reader-threads {threads} \
-          --batch-size 50 \
+          --batch-size 100 \
           --overwrite-existing-genomicsdb-workspace \
           $(awk '{{print "-L " $1}}' {REFERENCE_GENOME}.fai) &>> {log}
         echo "Finished GenomicsDBImport at: $(date)" >> {log}
