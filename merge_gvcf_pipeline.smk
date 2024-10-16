@@ -73,6 +73,11 @@ rule split_input_list:
     output: expand(os.path.join(LISTS_DIR, "subset_gvcfs.{idx}.list"), idx=range(needed_number_of_subsets))
     log:
         expand(os.path.join(LOG_DIR, "split_gvcfs.{idx}.log"), idx=range(needed_number_of_subsets))
+    threads: 2
+    resources:
+        mem_mb = lambda wildcards, threads: threads * 2500,
+        time = '24:00:00',
+        tmpdir = SCRATCH_DIR
     run:
         subsets = [gvcf_files[i:i+GVCFS_PER_BATCH] for i in range(0, len(gvcf_files), GVCFS_PER_BATCH)]
         for idx, subset in enumerate(subsets):
@@ -111,6 +116,11 @@ rule list_merged_gvcfs:
     output: os.path.join(LISTS_DIR, "merge.list")
     log:
         os.path.join(LOG_DIR, "list_merged_gvcfs.log")
+    threads: 2
+    resources:
+        mem_mb = lambda wildcards, threads: threads * 2500,
+        time = '24:00:00',
+        tmpdir = SCRATCH_DIR
     run:
         with open(output[0], 'w') as f:
             for file in input.merged_files:
