@@ -147,6 +147,7 @@ rule genomicsdb_import:
           --genomicsdb-workspace-path {output.db} \
           --tmp-dir {resources.tmpdir} \
           --reader-threads {threads} \
+          --batch-size 50 \
           --overwrite-existing-genomicsdb-workspace \
           $(awk '{{print "-L " $1}}' {REFERENCE_GENOME}.fai) &>> {log}
         echo "Finished GenomicsDBImport at: $(date)" >> {log}
