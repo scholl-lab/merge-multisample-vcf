@@ -4,7 +4,7 @@
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --time=168:00:00
-#SBATCH --mem-per-cpu=1200M
+#SBATCH --mem=2000M
 #SBATCH --output=slurm_logs/%x-%j.log
 
 # based on:
