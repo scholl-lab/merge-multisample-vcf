@@ -123,7 +123,7 @@ rule genomicsdb_import:
     threads: 8
     resources:
         mem_mb = 20000,
-        time = '48:00:00',
+        time = '240:00:00',
         tmpdir = SCRATCH_DIR
     conda:
         GATK_ENV
@@ -153,7 +153,7 @@ rule select_variants:
     threads: 8
     resources:
         mem_mb = 20000,
-        time = '24:00:00',
+        time = '72:00:00',
         tmpdir = SCRATCH_DIR
     conda:
         GATK_ENV
