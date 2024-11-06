@@ -4,7 +4,8 @@ import functools
 # ----------------------------------------------------------------------------------- #
 # SCRIPT DESCRIPTION:
 # This Snakemake script orchestrates a pipeline to reblock input GVCF files and then
-# uses GenomicsDBImport and GenotypeGVCFs to create per-contig multi-sample VCFs.
+# uses GenomicsDBImport and GenotypeGVCFs to create per-contig multi-sample VCFs,
+# followed by merging these VCFs into a single consolidated VCF using Picard's MergeVcfs.
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
@@ -80,10 +81,10 @@ with open(fai_file, 'r') as fai:
 # Define the rules for the Snakemake pipeline.
 # ----------------------------------------------------------------------------------- #
 
-# Rule to initiate the pipeline with all per-contig selected VCFs as the target outputs.
+# Rule to initiate the pipeline with the final merged VCF as the target output.
 rule all:
     input:
-        expand(os.path.join(FINAL_DIR, "genotyped_variants.{contig}.vcf.gz"), contig=contigs)
+        os.path.join(FINAL_DIR, "merged_variants.vcf.gz")
 
 # Rule to reblock the GVCF files and create sample map entries.
 rule reblock_gvcfs:
@@ -127,9 +128,13 @@ rule create_sample_map:
         os.path.join(LOG_DIR, "create_sample_map.log")
     run:
         with open(output[0], 'w') as outfile:
-            for sample_map_file in input.sample_map_entries:
-                with open(sample_map_file, 'r') as infile:
-                    outfile.write(infile.read())
+            for contig in contigs:
+                vcf = os.path.join(FINAL_DIR, f"genotyped_variants.{contig}.vcf.gz")
+                # Ensure the VCF exists before adding to the list
+                if os.path.exists(vcf):
+                    outfile.write(vcf + '\n')
+                else:
+                    raise FileNotFoundError(f"Expected VCF not found: {vcf}")
 
 # Rule to import GVCFs into separate GenomicsDB workspaces per contig.
 rule genomicsdb_import:
@@ -150,7 +155,7 @@ rule genomicsdb_import:
         """
         set -e
         echo "Starting GenomicsDBImport for contig {wildcards.contig} at: $(date)" > {log}
-        gatk --java-options "-Xmx{resources.mem_mb}m" GenomicsDBImport \
+        gatk --java-options "-Xmx{resources.mem_mb}m -XX:ParallelGCThreads=2" GenomicsDBImport \
           --sample-name-map {input.sample_map} \
           --genomicsdb-workspace-path {output.db} \
           --tmp-dir {resources.tmpdir} \
@@ -180,10 +185,52 @@ rule genotype_gvcfs:
         """
         set -e
         echo "Starting GenotypeGVCFs for contig {wildcards.contig} at: $(date)" > {log}
-        gatk --java-options "-Xmx{resources.mem_mb}m" GenotypeGVCFs \
+        gatk --java-options "-Xmx{resources.mem_mb}m -XX:ParallelGCThreads=2" GenotypeGVCFs \
           -R {REFERENCE_GENOME} \
           -V gendb://{input.db} \
           -O {output} &>> {log}
         echo "Finished GenotypeGVCFs for contig {wildcards.contig} at: $(date)" >> {log}
+        """
+
+# Rule to create a list of all per-contig VCFs for merging, sorted according to the .fai contig order.
+rule create_vcf_list:
+    input:
+        genotype_vcfs=expand(os.path.join(FINAL_DIR, "genotyped_variants.{contig}.vcf.gz"), contig=contigs)
+    output:
+        list_file=os.path.join(FINAL_DIR, "merged_vcfs.list")
+    log:
+        os.path.join(LOG_DIR, "create_vcf_list.log")
+    run:
+        with open(output.list_file, 'w') as outfile:
+            for contig in contigs:
+                vcf = os.path.join(FINAL_DIR, f"genotyped_variants.{contig}.vcf.gz")
+                if os.path.exists(vcf):
+                    outfile.write(vcf + '\n')
+                else:
+                    raise FileNotFoundError(f"Expected VCF not found: {vcf}")
+    
+# Rule to merge all per-contig VCFs into a single VCF using Picard's MergeVcfs.
+rule merge_vcfs:
+    input:
+        list_file=os.path.join(FINAL_DIR, "merged_vcfs.list")
+    output:
+        merged_vcf=os.path.join(FINAL_DIR, "merged_variants.vcf.gz")
+    log:
+        os.path.join(LOG_DIR, "merge_vcfs.log")
+    threads: 4
+    resources:
+        mem_mb = 40000,
+        time = '72:00:00',
+        tmpdir = SCRATCH_DIR
+    conda:
+        GATK_ENV
+    shell:
+        """
+        set -e
+        echo "Starting MergeVcfs at: $(date)" > {log}
+        picard MergeVcfs \
+            I={input.list_file} \
+            O={output.merged_vcf} &>> {log}
+        echo "Finished MergeVcfs at: $(date)" >> {log}
         """
 # ----------------------------------------------------------------------------------- #
