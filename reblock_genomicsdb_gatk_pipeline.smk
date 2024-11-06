@@ -122,7 +122,7 @@ rule genomicsdb_import:
         os.path.join(LOG_DIR, "genomicsdb_import.log")
     threads: 8
     resources:
-        mem_mb = 20000,
+        mem_mb = 40000,
         time = '240:00:00',
         tmpdir = SCRATCH_DIR
     conda:
@@ -136,7 +136,7 @@ rule genomicsdb_import:
           --genomicsdb-workspace-path {output.db} \
           --tmp-dir {resources.tmpdir} \
           --reader-threads {threads} \
-          --batch-size 100 \
+          --batch-size 50 \
           --overwrite-existing-genomicsdb-workspace \
           $(awk '{{print "-L " $1}}' {REFERENCE_GENOME}.fai) &>> {log}
         echo "Finished GenomicsDBImport at: $(date)" >> {log}
@@ -152,7 +152,7 @@ rule select_variants:
         os.path.join(LOG_DIR, "select_variants.log")
     threads: 8
     resources:
-        mem_mb = 20000,
+        mem_mb = 40000,
         time = '72:00:00',
         tmpdir = SCRATCH_DIR
     conda:
