@@ -4,7 +4,7 @@ import functools
 # ----------------------------------------------------------------------------------- #
 # SCRIPT DESCRIPTION:
 # This Snakemake script orchestrates a pipeline to reblock input GVCF files and then
-# use GenomicsDBImport and SelectVariants to create per-contig multi-sample VCFs.
+# uses GenomicsDBImport and GenotypeGVCFs to create per-contig multi-sample VCFs.
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
@@ -83,8 +83,7 @@ with open(fai_file, 'r') as fai:
 # Rule to initiate the pipeline with all per-contig selected VCFs as the target outputs.
 rule all:
     input:
-        expand(os.path.join(FINAL_DIR, "selected_variants.{contig}.m.vcf.gz"), contig=contigs)
-    # Note: No need to include 'all_samples.sample_map' as it's an intermediate step.
+        expand(os.path.join(FINAL_DIR, "genotyped_variants.{contig}.vcf.gz"), contig=contigs)
 
 # Rule to reblock the GVCF files and create sample map entries.
 rule reblock_gvcfs:
@@ -137,7 +136,7 @@ rule genomicsdb_import:
     input:
         sample_map=os.path.join(LISTS_DIR, "all_samples.sample_map")
     output:
-        db=os.path.join(GENOMICS_DB_DIR, "cohort_db_{contig}")
+        db=directory(os.path.join(GENOMICS_DB_DIR, "cohort_db_{contig}"))
     log:
         os.path.join(LOG_DIR, "genomicsdb_import.{contig}.log")
     threads: 8
@@ -145,8 +144,6 @@ rule genomicsdb_import:
         mem_mb = 40000,
         time = '240:00:00',
         tmpdir = SCRATCH_DIR
-    params:
-        contig=lambda wildcards: wildcards.contig
     conda:
         GATK_ENV
     shell:
@@ -158,20 +155,20 @@ rule genomicsdb_import:
           --genomicsdb-workspace-path {output.db} \
           --tmp-dir {resources.tmpdir} \
           --reader-threads {threads} \
-          --batch-size 50 \
+          --batch-size 100 \
           --overwrite-existing-genomicsdb-workspace \
           -L {wildcards.contig} &>> {log}
         echo "Finished GenomicsDBImport for contig {wildcards.contig} at: $(date)" >> {log}
         """
 
-# Rule to select variants from each GenomicsDB workspace per contig.
-rule select_variants:
+# Rule to perform joint genotyping using GenotypeGVCFs from each GenomicsDB workspace per contig.
+rule genotype_gvcfs:
     input:
         db=os.path.join(GENOMICS_DB_DIR, "cohort_db_{contig}")
     output:
-        os.path.join(FINAL_DIR, "selected_variants.{contig}.m.vcf.gz")
+        os.path.join(FINAL_DIR, "genotyped_variants.{contig}.vcf.gz")
     log:
-        os.path.join(LOG_DIR, "select_variants.{contig}.log")
+        os.path.join(LOG_DIR, "genotype_gvcfs.{contig}.log")
     threads: 8
     resources:
         mem_mb = 40000,
@@ -182,11 +179,11 @@ rule select_variants:
     shell:
         """
         set -e
-        echo "Starting SelectVariants for contig {wildcards.contig} at: $(date)" > {log}
-        gatk --java-options "-Xmx{resources.mem_mb}m" SelectVariants \
+        echo "Starting GenotypeGVCFs for contig {wildcards.contig} at: $(date)" > {log}
+        gatk --java-options "-Xmx{resources.mem_mb}m" GenotypeGVCFs \
           -R {REFERENCE_GENOME} \
           -V gendb://{input.db} \
           -O {output} &>> {log}
-        echo "Finished SelectVariants for contig {wildcards.contig} at: $(date)" >> {log}
+        echo "Finished GenotypeGVCFs for contig {wildcards.contig} at: $(date)" >> {log}
         """
 # ----------------------------------------------------------------------------------- #
