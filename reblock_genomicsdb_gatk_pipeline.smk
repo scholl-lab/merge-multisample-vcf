@@ -142,7 +142,7 @@ rule genomicsdb_import:
         os.path.join(LOG_DIR, "genomicsdb_import.{contig}.log")
     threads: 2
     resources:
-        mem_mb = 40000,
+        mem_mb = 20000,
         time = '240:00:00',
         tmpdir = SCRATCH_DIR
     conda:
@@ -172,7 +172,7 @@ rule genotype_gvcfs:
         os.path.join(LOG_DIR, "genotype_gvcfs.{contig}.log")
     threads: 2
     resources:
-        mem_mb = 40000,
+        mem_mb = 20000,
         time = '72:00:00',
         tmpdir = SCRATCH_DIR
     conda:
@@ -215,7 +215,7 @@ rule merge_vcfs:
         os.path.join(LOG_DIR, "merge_vcfs.log")
     threads: 2
     resources:
-        mem_mb = 40000,
+        mem_mb = 20000,
         time = '72:00:00',
         tmpdir = SCRATCH_DIR
     conda:
