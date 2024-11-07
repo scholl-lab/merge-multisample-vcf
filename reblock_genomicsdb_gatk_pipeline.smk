@@ -128,13 +128,9 @@ rule create_sample_map:
         os.path.join(LOG_DIR, "create_sample_map.log")
     run:
         with open(output[0], 'w') as outfile:
-            for contig in contigs:
-                vcf = os.path.join(FINAL_DIR, f"genotyped_variants.{contig}.vcf.gz")
-                # Ensure the VCF exists before adding to the list
-                if os.path.exists(vcf):
-                    outfile.write(vcf + '\n')
-                else:
-                    raise FileNotFoundError(f"Expected VCF not found: {vcf}")
+            for sample_map_file in input.sample_map_entries:
+                with open(sample_map_file, 'r') as infile:
+                    outfile.write(infile.read())
 
 # Rule to import GVCFs into separate GenomicsDB workspaces per contig.
 rule genomicsdb_import:
