@@ -140,7 +140,7 @@ rule genomicsdb_import:
         db=directory(os.path.join(GENOMICS_DB_DIR, "cohort_db_{contig}"))
     log:
         os.path.join(LOG_DIR, "genomicsdb_import.{contig}.log")
-    threads: 8
+    threads: 2
     resources:
         mem_mb = 40000,
         time = '240:00:00',
@@ -170,7 +170,7 @@ rule genotype_gvcfs:
         os.path.join(FINAL_DIR, "genotyped_variants.{contig}.vcf.gz")
     log:
         os.path.join(LOG_DIR, "genotype_gvcfs.{contig}.log")
-    threads: 8
+    threads: 2
     resources:
         mem_mb = 40000,
         time = '72:00:00',
@@ -213,7 +213,7 @@ rule merge_vcfs:
         merged_vcf=os.path.join(FINAL_DIR, "merged_variants.vcf.gz")
     log:
         os.path.join(LOG_DIR, "merge_vcfs.log")
-    threads: 4
+    threads: 2
     resources:
         mem_mb = 40000,
         time = '72:00:00',
