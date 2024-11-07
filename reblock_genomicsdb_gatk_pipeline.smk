@@ -156,7 +156,7 @@ rule genomicsdb_import:
           --genomicsdb-workspace-path {output.db} \
           --tmp-dir {resources.tmpdir} \
           --reader-threads {threads} \
-          --batch-size 100 \
+          --batch-size 50 \
           --overwrite-existing-genomicsdb-workspace \
           -L {wildcards.contig} &>> {log}
         echo "Finished GenomicsDBImport for contig {wildcards.contig} at: $(date)" >> {log}
