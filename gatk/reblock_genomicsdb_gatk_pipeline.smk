@@ -24,6 +24,7 @@ INPUT_FILE = config["gvcf_list_file"]
 GATK_ENV = config["gatk_env"]
 REFERENCE_GENOME = config["reference_genome"]
 SCATTER_COUNT = int(config.get("scatter_count", 400))  # Number of intervals to split into
+FINAL_VCF_NAME = config.get("final_vcf_name", "merged_variants.vcf.gz")  # Final VCF filename
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
@@ -77,7 +78,7 @@ interval_ids = [str(i) for i in range(1, SCATTER_COUNT + 1)]
 # Rule to initiate the pipeline with the final merged VCF as the target output.
 rule all:
     input:
-        os.path.join(FINAL_DIR, "merged_variants.vcf.gz")
+        os.path.join(FINAL_DIR, FINAL_VCF_NAME)
 
 # Rule to generate intervals using ScatterIntervalsByNs.
 rule scatter_intervals_by_ns:
@@ -214,7 +215,7 @@ rule genotype_gvcfs:
         os.path.join(LOG_DIR, "genotype_gvcfs.{interval_id}.log")
     threads: 2
     resources:
-        mem_mb=20000,
+        mem_mb=40000,
         time='72:00:00',
         tmpdir=SCRATCH_DIR
     conda:
@@ -225,6 +226,8 @@ rule genotype_gvcfs:
         echo "Starting GenotypeGVCFs for interval {wildcards.interval_id} at: $(date)" > {log}
         gatk --java-options "-Xmx{resources.mem_mb}m -XX:ParallelGCThreads=2" GenotypeGVCFs \
           -R {REFERENCE_GENOME} \
+          --only-output-calls-starting-in-intervals \
+          --use-new-qual-calculator \
           -V gendb://{input.db} \
           -O {output} \
           -L {input.interval_list} &>> {log}
@@ -250,7 +253,7 @@ rule merge_vcfs:
     input:
         list_file=os.path.join(FINAL_DIR, "merged_vcfs.list")
     output:
-        merged_vcf=os.path.join(FINAL_DIR, "merged_variants.vcf.gz")
+        merged_vcf=os.path.join(FINAL_DIR, FINAL_VCF_NAME)
     log:
         os.path.join(LOG_DIR, "merge_vcfs.log")
     threads: 2
