@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-#SBATCH --job-name=merge_gvcf_pipeline
+#SBATCH --job-name=merge_sequential
 #SBATCH --ntasks=1
 #SBATCH --nodes=1
 #SBATCH --time=168:00:00
-#SBATCH --mem-per-cpu=1200M
+#SBATCH --mem=2000M
 #SBATCH --output=slurm_logs/%x-%j.log
 
 # based on:
@@ -22,5 +22,5 @@ mkdir -p slurm_logs
 export SBATCH_DEFAULTS=" --output=slurm_logs/%x-%j.log"
 
 date
-srun snakemake -s merge_gvcf_pipeline.smk --use-conda --profile=cubi-v1 -j100
+srun snakemake -s merge_sequential.smk --use-conda --profile=cubi-v1 -j200
 date
