@@ -4,7 +4,7 @@ import functools
 # ----------------------------------------------------------------------------------- #
 # SCRIPT DESCRIPTION:
 # This Snakemake script orchestrates a pipeline to reblock input GVCF files and then
-# uses GenomicsDBImport and GenotypeGVCFs to create per-contig multi-sample VCFs,
+# uses GenomicsDBImport and GenotypeGVCFs to create multi-sample VCFs over equal intervals,
 # followed by merging these VCFs into a single consolidated VCF using Picard's MergeVcfs.
 # ----------------------------------------------------------------------------------- #
 
@@ -23,6 +23,7 @@ configfile: "config.yaml"
 INPUT_FILE = config["gvcf_list_file"]
 GATK_ENV = config["gatk_env"]
 REFERENCE_GENOME = config["reference_genome"]
+SCATTER_COUNT = int(config.get("scatter_count", 400))  # Number of intervals to split into
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
@@ -36,9 +37,10 @@ REBLOCK_DIR = prefix_results('reblocked_gvcfs')
 GENOMICS_DB_DIR = prefix_results('genomicsdb')
 FINAL_DIR = prefix_results('final')
 LOG_DIR = prefix_results('logs')
+INTERVALS_DIR = prefix_results('intervals')
 
 # Ensure all output directories, including the log directory, exist.
-for output_dir in [LISTS_DIR, REBLOCK_DIR, GENOMICS_DB_DIR, FINAL_DIR, LOG_DIR]:
+for output_dir in [LISTS_DIR, REBLOCK_DIR, GENOMICS_DB_DIR, FINAL_DIR, LOG_DIR, INTERVALS_DIR]:
     os.makedirs(output_dir, exist_ok=True)
 # ----------------------------------------------------------------------------------- #
 
@@ -59,21 +61,12 @@ sample_to_gvcf = dict(zip(samples, gvcf_list))
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
-# CONTIG IDENTIFICATION:
-# Extract the list of contigs from the reference genome's .fai file.
+# INTERVAL IDENTIFICATION:
+# Define interval IDs based on SCATTER_COUNT.
 # ----------------------------------------------------------------------------------- #
 
-# Ensure that the reference genome index (.fai) exists.
-fai_file = REFERENCE_GENOME + ".fai"
-if not os.path.exists(fai_file):
-    raise FileNotFoundError(f"Reference genome index file not found: {fai_file}")
-
-# Extract contig names from the .fai file.
-contigs = []
-with open(fai_file, 'r') as fai:
-    for line in fai:
-        contig = line.split()[0]
-        contigs.append(contig)
+# Generate interval IDs from 1 to SCATTER_COUNT.
+interval_ids = [str(i) for i in range(1, SCATTER_COUNT + 1)]
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
@@ -86,6 +79,53 @@ rule all:
     input:
         os.path.join(FINAL_DIR, "merged_variants.vcf.gz")
 
+# Rule to generate intervals using ScatterIntervalsByNs.
+rule scatter_intervals_by_ns:
+    input:
+        reference=REFERENCE_GENOME
+    output:
+        intervals_list=os.path.join(INTERVALS_DIR, "intervals.interval_list")
+    log:
+        os.path.join(LOG_DIR, "scatter_intervals_by_ns.log")
+    conda:
+        GATK_ENV
+    shell:
+        """
+        set -e
+        echo "Starting ScatterIntervalsByNs at: $(date)" > {log}
+        gatk ScatterIntervalsByNs \
+            -R {input.reference} \
+            -O {output.intervals_list} &>> {log}
+        echo "Finished ScatterIntervalsByNs at: $(date)" >> {log}
+        """
+
+# Rule to split intervals into equal parts using SplitIntervals.
+rule split_intervals:
+    input:
+        intervals_list=os.path.join(INTERVALS_DIR, "intervals.interval_list"),
+        reference=REFERENCE_GENOME
+    output:
+        interval_files=expand(os.path.join(INTERVALS_DIR, "scattered.interval_{interval_id}_of_{scatter_count}.interval_list"),
+                              interval_id=interval_ids,
+                              scatter_count=str(SCATTER_COUNT))
+    params:
+        scatter_count=SCATTER_COUNT
+    log:
+        os.path.join(LOG_DIR, "split_intervals.log")
+    conda:
+        GATK_ENV
+    shell:
+        """
+        set -e
+        echo "Starting SplitIntervals at: $(date)" > {log}
+        gatk SplitIntervals \
+            -R {input.reference} \
+            -L {input.intervals_list} \
+            --scatter-count {params.scatter_count} \
+            -O {INTERVALS_DIR} &>> {log}
+        echo "Finished SplitIntervals at: $(date)" >> {log}
+        """
+
 # Rule to reblock the GVCF files and create sample map entries.
 rule reblock_gvcfs:
     input:
@@ -97,9 +137,9 @@ rule reblock_gvcfs:
         os.path.join(LOG_DIR, "reblock_gvcf.{sample}.log")
     threads: 2
     resources:
-        mem_mb = 8000,
-        time = '24:00:00',
-        tmpdir = SCRATCH_DIR
+        mem_mb=8000,
+        time='24:00:00',
+        tmpdir=SCRATCH_DIR
     conda:
         GATK_ENV
     shell:
@@ -132,25 +172,26 @@ rule create_sample_map:
                 with open(sample_map_file, 'r') as infile:
                     outfile.write(infile.read())
 
-# Rule to import GVCFs into separate GenomicsDB workspaces per contig.
+# Rule to import GVCFs into GenomicsDB workspaces per interval.
 rule genomicsdb_import:
     input:
-        sample_map=os.path.join(LISTS_DIR, "all_samples.sample_map")
+        sample_map=os.path.join(LISTS_DIR, "all_samples.sample_map"),
+        interval_list=lambda wildcards: os.path.join(INTERVALS_DIR, f'scattered.interval_{wildcards.interval_id}_of_{SCATTER_COUNT}.interval_list')
     output:
-        db=directory(os.path.join(GENOMICS_DB_DIR, "cohort_db_{contig}"))
+        db=directory(os.path.join(GENOMICS_DB_DIR, "cohort_db_{interval_id}"))
     log:
-        os.path.join(LOG_DIR, "genomicsdb_import.{contig}.log")
+        os.path.join(LOG_DIR, "genomicsdb_import.{interval_id}.log")
     threads: 2
     resources:
-        mem_mb = 20000,
-        time = '240:00:00',
-        tmpdir = SCRATCH_DIR
+        mem_mb=20000,
+        time='240:00:00',
+        tmpdir=SCRATCH_DIR
     conda:
         GATK_ENV
     shell:
         """
         set -e
-        echo "Starting GenomicsDBImport for contig {wildcards.contig} at: $(date)" > {log}
+        echo "Starting GenomicsDBImport for interval {wildcards.interval_id} at: $(date)" > {log}
         gatk --java-options "-Xmx{resources.mem_mb}m -XX:ParallelGCThreads=2" GenomicsDBImport \
           --sample-name-map {input.sample_map} \
           --genomicsdb-workspace-path {output.db} \
@@ -158,54 +199,53 @@ rule genomicsdb_import:
           --reader-threads {threads} \
           --batch-size 50 \
           --overwrite-existing-genomicsdb-workspace \
-          -L {wildcards.contig} &>> {log}
-        echo "Finished GenomicsDBImport for contig {wildcards.contig} at: $(date)" >> {log}
+          -L {input.interval_list} &>> {log}
+        echo "Finished GenomicsDBImport for interval {wildcards.interval_id} at: $(date)" >> {log}
         """
 
-# Rule to perform joint genotyping using GenotypeGVCFs from each GenomicsDB workspace per contig.
+# Rule to perform joint genotyping using GenotypeGVCFs per interval.
 rule genotype_gvcfs:
     input:
-        db=os.path.join(GENOMICS_DB_DIR, "cohort_db_{contig}")
+        db=os.path.join(GENOMICS_DB_DIR, "cohort_db_{interval_id}"),
+        interval_list=lambda wildcards: os.path.join(INTERVALS_DIR, f'scattered.interval_{wildcards.interval_id}_of_{SCATTER_COUNT}.interval_list')
     output:
-        os.path.join(FINAL_DIR, "genotyped_variants.{contig}.vcf.gz")
+        os.path.join(FINAL_DIR, "genotyped_variants.interval_{interval_id}.vcf.gz")
     log:
-        os.path.join(LOG_DIR, "genotype_gvcfs.{contig}.log")
+        os.path.join(LOG_DIR, "genotype_gvcfs.{interval_id}.log")
     threads: 2
     resources:
-        mem_mb = 20000,
-        time = '72:00:00',
-        tmpdir = SCRATCH_DIR
+        mem_mb=20000,
+        time='72:00:00',
+        tmpdir=SCRATCH_DIR
     conda:
         GATK_ENV
     shell:
         """
         set -e
-        echo "Starting GenotypeGVCFs for contig {wildcards.contig} at: $(date)" > {log}
+        echo "Starting GenotypeGVCFs for interval {wildcards.interval_id} at: $(date)" > {log}
         gatk --java-options "-Xmx{resources.mem_mb}m -XX:ParallelGCThreads=2" GenotypeGVCFs \
           -R {REFERENCE_GENOME} \
           -V gendb://{input.db} \
-          -O {output} &>> {log}
-        echo "Finished GenotypeGVCFs for contig {wildcards.contig} at: $(date)" >> {log}
+          -O {output} \
+          -L {input.interval_list} &>> {log}
+        echo "Finished GenotypeGVCFs for interval {wildcards.interval_id} at: $(date)" >> {log}
         """
 
-# Rule to create a list of all per-contig VCFs for merging, sorted according to the .fai contig order.
+# Rule to create a list of all VCFs for merging.
 rule create_vcf_list:
     input:
-        genotype_vcfs=expand(os.path.join(FINAL_DIR, "genotyped_variants.{contig}.vcf.gz"), contig=contigs)
+        genotype_vcfs=expand(os.path.join(FINAL_DIR, "genotyped_variants.interval_{interval_id}.vcf.gz"),
+                             interval_id=interval_ids)
     output:
         list_file=os.path.join(FINAL_DIR, "merged_vcfs.list")
     log:
         os.path.join(LOG_DIR, "create_vcf_list.log")
     run:
         with open(output.list_file, 'w') as outfile:
-            for contig in contigs:
-                vcf = os.path.join(FINAL_DIR, f"genotyped_variants.{contig}.vcf.gz")
-                if os.path.exists(vcf):
-                    outfile.write(vcf + '\n')
-                else:
-                    raise FileNotFoundError(f"Expected VCF not found: {vcf}")
-    
-# Rule to merge all per-contig VCFs into a single VCF using Picard's MergeVcfs.
+            for vcf in input.genotype_vcfs:
+                outfile.write(f"I={vcf}\n")
+
+# Rule to merge all VCFs into a single VCF using Picard's MergeVcfs.
 rule merge_vcfs:
     input:
         list_file=os.path.join(FINAL_DIR, "merged_vcfs.list")
@@ -215,9 +255,9 @@ rule merge_vcfs:
         os.path.join(LOG_DIR, "merge_vcfs.log")
     threads: 2
     resources:
-        mem_mb = 20000,
-        time = '72:00:00',
-        tmpdir = SCRATCH_DIR
+        mem_mb=20000,
+        time='72:00:00',
+        tmpdir=SCRATCH_DIR
     conda:
         GATK_ENV
     shell:
@@ -225,7 +265,7 @@ rule merge_vcfs:
         set -e
         echo "Starting MergeVcfs at: $(date)" > {log}
         picard MergeVcfs \
-            I={input.list_file} \
+            $(cat {input.list_file}) \
             O={output.merged_vcf} &>> {log}
         echo "Finished MergeVcfs at: $(date)" >> {log}
         """
