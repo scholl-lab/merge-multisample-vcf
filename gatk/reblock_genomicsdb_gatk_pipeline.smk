@@ -66,8 +66,8 @@ sample_to_gvcf = dict(zip(samples, gvcf_list))
 # Define interval IDs based on SCATTER_COUNT.
 # ----------------------------------------------------------------------------------- #
 
-# Generate interval IDs from 1 to SCATTER_COUNT.
-interval_ids = [str(i) for i in range(1, SCATTER_COUNT + 1)]
+# Generate zero-padded interval IDs from '0000' to the highest number.
+interval_ids = [str(i).zfill(4) for i in range(0, SCATTER_COUNT)]
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
@@ -106,9 +106,8 @@ rule split_intervals:
         intervals_list=os.path.join(INTERVALS_DIR, "intervals.interval_list"),
         reference=REFERENCE_GENOME
     output:
-        interval_files=expand(os.path.join(INTERVALS_DIR, "scattered.interval_{interval_id}_of_{scatter_count}.interval_list"),
-                              interval_id=interval_ids,
-                              scatter_count=str(SCATTER_COUNT))
+        interval_files=expand(os.path.join(INTERVALS_DIR, "{interval_id}-scattered.interval_list"),
+                              interval_id=interval_ids)
     params:
         scatter_count=SCATTER_COUNT
     log:
@@ -177,14 +176,14 @@ rule create_sample_map:
 rule genomicsdb_import:
     input:
         sample_map=os.path.join(LISTS_DIR, "all_samples.sample_map"),
-        interval_list=lambda wildcards: os.path.join(INTERVALS_DIR, f'scattered.interval_{wildcards.interval_id}_of_{SCATTER_COUNT}.interval_list')
+        interval_list=lambda wildcards: os.path.join(INTERVALS_DIR, f'{wildcards.interval_id}-scattered.interval_list')
     output:
         db=directory(os.path.join(GENOMICS_DB_DIR, "cohort_db_{interval_id}"))
     log:
         os.path.join(LOG_DIR, "genomicsdb_import.{interval_id}.log")
     threads: 2
     resources:
-        mem_mb=20000,
+        mem_mb=60000,
         time='240:00:00',
         tmpdir=SCRATCH_DIR
     conda:
@@ -208,14 +207,14 @@ rule genomicsdb_import:
 rule genotype_gvcfs:
     input:
         db=os.path.join(GENOMICS_DB_DIR, "cohort_db_{interval_id}"),
-        interval_list=lambda wildcards: os.path.join(INTERVALS_DIR, f'scattered.interval_{wildcards.interval_id}_of_{SCATTER_COUNT}.interval_list')
+        interval_list=lambda wildcards: os.path.join(INTERVALS_DIR, f'{wildcards.interval_id}-scattered.interval_list')
     output:
         os.path.join(FINAL_DIR, "genotyped_variants.interval_{interval_id}.vcf.gz")
     log:
         os.path.join(LOG_DIR, "genotype_gvcfs.{interval_id}.log")
     threads: 2
     resources:
-        mem_mb=40000,
+        mem_mb=60000,
         time='72:00:00',
         tmpdir=SCRATCH_DIR
     conda:
