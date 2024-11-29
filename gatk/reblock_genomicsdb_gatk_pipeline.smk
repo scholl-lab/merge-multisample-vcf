@@ -71,6 +71,17 @@ interval_ids = [str(i).zfill(4) for i in range(0, SCATTER_COUNT)]
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
+# CUSTOM FUNCTION TO INCREMENT MEMORY:
+# This function will double the memory allocation with each retry, up to a maximum.
+# ----------------------------------------------------------------------------------- #
+
+def increment_memory(base_memory):
+    def mem(wildcards, attempt):
+        return base_memory * (2 ** (attempt - 1))
+    return mem
+# ----------------------------------------------------------------------------------- #
+
+# ----------------------------------------------------------------------------------- #
 # PIPELINE RULES:
 # Define the rules for the Snakemake pipeline.
 # ----------------------------------------------------------------------------------- #
@@ -138,7 +149,7 @@ rule reblock_gvcfs:
     threads: 2
     resources:
         mem_mb=8000,
-        time='24:00:00',
+        time='04:00:00',
         tmpdir=SCRATCH_DIR
     conda:
         GATK_ENV
@@ -181,22 +192,24 @@ rule genomicsdb_import:
         db=directory(os.path.join(GENOMICS_DB_DIR, "cohort_db_{interval_id}"))
     log:
         os.path.join(LOG_DIR, "genomicsdb_import.{interval_id}.log")
-    threads: 2
+    threads: 1
     resources:
-        mem_mb=60000,
-        time='240:00:00',
+        mem_mb=increment_memory(20000),
+        time='04:00:00',
         tmpdir=SCRATCH_DIR
     conda:
         GATK_ENV
     shell:
-        """
+        r"""
         set -e
         echo "Starting GenomicsDBImport for interval {wildcards.interval_id} at: $(date)" > {log}
+        echo "Using Java memory: -Xmx{resources.mem_mb}m" >> {log}
         gatk --java-options "-Xmx{resources.mem_mb}m -XX:ParallelGCThreads=2" GenomicsDBImport \
           --sample-name-map {input.sample_map} \
           --genomicsdb-workspace-path {output.db} \
           --tmp-dir {resources.tmpdir} \
           --reader-threads {threads} \
+          --genomicsdb-shared-posixfs-optimizations true \
           --batch-size 50 \
           --overwrite-existing-genomicsdb-workspace \
           -L {input.interval_list} &>> {log}
@@ -212,20 +225,22 @@ rule genotype_gvcfs:
         os.path.join(FINAL_DIR, "genotyped_variants.interval_{interval_id}.vcf.gz")
     log:
         os.path.join(LOG_DIR, "genotype_gvcfs.{interval_id}.log")
-    threads: 2
+    threads: 1
     resources:
-        mem_mb=60000,
+        mem_mb=increment_memory(10000),
         time='72:00:00',
         tmpdir=SCRATCH_DIR
     conda:
         GATK_ENV
     shell:
-        """
+        r"""
         set -e
         echo "Starting GenotypeGVCFs for interval {wildcards.interval_id} at: $(date)" > {log}
+        echo "Using Java memory: -Xmx{resources.mem_mb}m" >> {log}
         gatk --java-options "-Xmx{resources.mem_mb}m -XX:ParallelGCThreads=2" GenotypeGVCFs \
           -R {REFERENCE_GENOME} \
-          --only-output-calls-starting-in-intervals \
+          --variant-output-filtering STARTS_IN \
+          --max-alternate-alleles 4 \
           --use-new-qual-calculator \
           -V gendb://{input.db} \
           -O {output} \
