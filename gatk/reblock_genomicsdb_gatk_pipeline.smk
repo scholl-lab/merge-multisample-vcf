@@ -189,12 +189,12 @@ rule reblock_gvcfs:
         set -e
         echo "Starting ReblockGVCF for sample {wildcards.sample} at: $(date)" > {log}
         gatk --java-options "-Xmx{resources.mem_mb}m" ReblockGVCF \
+          --drop-low-quals \
+          --rgq-threshold-to-no-call 10 \
+          --do-qual-score-approximation \
           -R {REFERENCE_GENOME} \
           -V {input.gvcf} \
-          -O {output.reblocked_gvcf} \ 
-          --drop-low-quals \ 
-          --rgq-threshold-to-no-call 10 \ 
-          --do-qual-score-approximation &>> {log}
+          -O {output.reblocked_gvcf} &>> {log}
         
         # Extract sample name from the reblocked GVCF
         sample_name=$(zgrep "^#CHROM" {output.reblocked_gvcf} | head -n1 | cut -f10)
