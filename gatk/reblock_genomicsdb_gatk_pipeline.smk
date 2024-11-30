@@ -189,9 +189,6 @@ rule reblock_gvcfs:
         set -e
         echo "Starting ReblockGVCF for sample {wildcards.sample} at: $(date)" > {log}
         gatk --java-options "-Xmx{resources.mem_mb}m" ReblockGVCF \
-          --drop-low-quals \
-          --rgq-threshold-to-no-call 10 \
-          --do-qual-score-approximation \
           -R {REFERENCE_GENOME} \
           -V {input.gvcf} \
           -O {output.reblocked_gvcf} &>> {log}
