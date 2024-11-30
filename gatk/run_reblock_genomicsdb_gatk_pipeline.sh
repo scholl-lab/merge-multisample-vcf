@@ -22,5 +22,5 @@ mkdir -p slurm_logs
 export SBATCH_DEFAULTS=" --output=slurm_logs/%x-%j.log"
 
 date
-srun snakemake -s reblock_genomicsdb_gatk_pipeline.smk --use-conda --profile=cubi-v1 --retries 4 -j500
+srun snakemake -s reblock_genomicsdb_gatk_pipeline.smk --use-conda --profile=cubi-v1 --retries 4 -j1000
 date

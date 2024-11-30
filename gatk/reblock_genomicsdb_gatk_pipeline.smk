@@ -6,6 +6,7 @@ import functools
 # This Snakemake script orchestrates a pipeline to reblock input GVCF files and then
 # uses GenomicsDBImport and GenotypeGVCFs to create multi-sample VCFs over equal intervals,
 # followed by merging these VCFs into a single consolidated VCF using Picard's MergeVcfs.
+# It now supports both genome and exome sequencing, allowing the use of a BED file for exome.
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
@@ -18,13 +19,20 @@ SCRATCH_DIR = os.environ.get('TMPDIR', '/tmp')
 # ----------------------------------------------------------------------------------- #
 # CONFIGURATION:
 # Extract the necessary parameters from the configuration file, including input 
-# file, the Conda environments to be used, and reference genome.
+# file, the Conda environments to be used, reference genome, and design type.
 configfile: "config.yaml"
 INPUT_FILE = config["gvcf_list_file"]
 GATK_ENV = config["gatk_env"]
 REFERENCE_GENOME = config["reference_genome"]
 SCATTER_COUNT = int(config.get("scatter_count", 400))  # Number of intervals to split into
 FINAL_VCF_NAME = config.get("final_vcf_name", "merged_variants.vcf.gz")  # Final VCF filename
+
+# Design type and related parameters
+DESIGN = config.get("design", "genome")  # "genome" or "exome"
+EXOME_BED_FILE = config.get("exome_bed_file", None)
+INTERVAL_PADDING = int(config.get("interval_padding", 0))
+SUBDIVISION_MODE = config.get("subdivision_mode", None)
+ADDITIONAL_INTERVALS = config.get("additional_intervals", [])
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
@@ -77,8 +85,20 @@ interval_ids = [str(i).zfill(4) for i in range(0, SCATTER_COUNT)]
 
 def increment_memory(base_memory):
     def mem(wildcards, attempt):
-        return base_memory * (2 ** (attempt - 1))
+        max_memory = 160000   # Maximum memory in MB (e.g., 80 GB)
+        mem_mb = base_memory * (2 ** (attempt - 1))
+        return min(mem_mb, max_memory)
     return mem
+# ----------------------------------------------------------------------------------- #
+
+# ----------------------------------------------------------------------------------- #
+# INTERVALS LIST SETUP:
+# Determine the intervals list based on the design.
+# ----------------------------------------------------------------------------------- #
+if DESIGN == "genome":
+    INTERVALS_LIST = os.path.join(INTERVALS_DIR, "intervals.interval_list")
+else:
+    INTERVALS_LIST = EXOME_BED_FILE
 # ----------------------------------------------------------------------------------- #
 
 # ----------------------------------------------------------------------------------- #
@@ -89,38 +109,48 @@ def increment_memory(base_memory):
 # Rule to initiate the pipeline with the final merged VCF as the target output.
 rule all:
     input:
-        os.path.join(FINAL_DIR, FINAL_VCF_NAME)
+        os.path.join(FINAL_DIR, FINAL_VCF_NAME),
+        expand(os.path.join(INTERVALS_DIR, "{interval_id}-scattered.interval_list"),
+               interval_id=interval_ids)
 
-# Rule to generate intervals using ScatterIntervalsByNs.
-rule scatter_intervals_by_ns:
-    input:
-        reference=REFERENCE_GENOME
-    output:
-        intervals_list=os.path.join(INTERVALS_DIR, "intervals.interval_list")
-    log:
-        os.path.join(LOG_DIR, "scatter_intervals_by_ns.log")
-    conda:
-        GATK_ENV
-    shell:
-        """
-        set -e
-        echo "Starting ScatterIntervalsByNs at: $(date)" > {log}
-        gatk ScatterIntervalsByNs \
-            -R {input.reference} \
-            -O {output.intervals_list} &>> {log}
-        echo "Finished ScatterIntervalsByNs at: $(date)" >> {log}
-        """
+# Include the scatter_intervals_by_ns rule only if DESIGN is "genome"
+if DESIGN == "genome":
+    # Rule to generate intervals using ScatterIntervalsByNs.
+    rule scatter_intervals_by_ns:
+        input:
+            reference=REFERENCE_GENOME
+        output:
+            intervals_list=INTERVALS_LIST
+        log:
+            os.path.join(LOG_DIR, "scatter_intervals_by_ns.log")
+        conda:
+            GATK_ENV
+        shell:
+            """
+            set -e
+            echo "Starting ScatterIntervalsByNs at: $(date)" > {log}
+            gatk ScatterIntervalsByNs \
+                -R {input.reference} \
+                -O {output.intervals_list} &>> {log}
+            echo "Finished ScatterIntervalsByNs at: $(date)" >> {log}
+            """
 
 # Rule to split intervals into equal parts using SplitIntervals.
 rule split_intervals:
     input:
-        intervals_list=os.path.join(INTERVALS_DIR, "intervals.interval_list"),
+        intervals_list=INTERVALS_LIST,
         reference=REFERENCE_GENOME
     output:
         interval_files=expand(os.path.join(INTERVALS_DIR, "{interval_id}-scattered.interval_list"),
                               interval_id=interval_ids)
     params:
-        scatter_count=SCATTER_COUNT
+        scatter_count=SCATTER_COUNT,
+        # Build options string with non-empty parameters
+        options=" ".join(filter(None, [
+            " ".join("-L {}".format(interval) for interval in ADDITIONAL_INTERVALS),
+            "-ip {}".format(INTERVAL_PADDING) if INTERVAL_PADDING > 0 else "",
+            "--subdivision-mode {}".format(SUBDIVISION_MODE) if SUBDIVISION_MODE else ""
+        ]))
     log:
         os.path.join(LOG_DIR, "split_intervals.log")
     conda:
@@ -132,6 +162,7 @@ rule split_intervals:
         gatk SplitIntervals \
             -R {input.reference} \
             -L {input.intervals_list} \
+            {params.options} \
             --scatter-count {params.scatter_count} \
             -O {INTERVALS_DIR} &>> {log}
         echo "Finished SplitIntervals at: $(date)" >> {log}
@@ -160,7 +191,10 @@ rule reblock_gvcfs:
         gatk --java-options "-Xmx{resources.mem_mb}m" ReblockGVCF \
           -R {REFERENCE_GENOME} \
           -V {input.gvcf} \
-          -O {output.reblocked_gvcf} &>> {log}
+          -O {output.reblocked_gvcf} \ 
+          --drop-low-quals \ 
+          --rgq-threshold-to-no-call 10 \ 
+          --do-qual-score-approximation &>> {log}
         
         # Extract sample name from the reblocked GVCF
         sample_name=$(zgrep "^#CHROM" {output.reblocked_gvcf} | head -n1 | cut -f10)
@@ -187,14 +221,14 @@ rule create_sample_map:
 rule genomicsdb_import:
     input:
         sample_map=os.path.join(LISTS_DIR, "all_samples.sample_map"),
-        interval_list=lambda wildcards: os.path.join(INTERVALS_DIR, f'{wildcards.interval_id}-scattered.interval_list')
+        interval_list=os.path.join(INTERVALS_DIR, '{interval_id}-scattered.interval_list')
     output:
         db=directory(os.path.join(GENOMICS_DB_DIR, "cohort_db_{interval_id}"))
     log:
         os.path.join(LOG_DIR, "genomicsdb_import.{interval_id}.log")
-    threads: 1
+    threads: 2
     resources:
-        mem_mb=increment_memory(20000),
+        mem_mb=increment_memory(40000),
         time='04:00:00',
         tmpdir=SCRATCH_DIR
     conda:
@@ -208,7 +242,7 @@ rule genomicsdb_import:
           --sample-name-map {input.sample_map} \
           --genomicsdb-workspace-path {output.db} \
           --tmp-dir {resources.tmpdir} \
-          --reader-threads {threads} \
+          --reader-threads 1 \
           --genomicsdb-shared-posixfs-optimizations true \
           --batch-size 50 \
           --overwrite-existing-genomicsdb-workspace \
@@ -220,15 +254,15 @@ rule genomicsdb_import:
 rule genotype_gvcfs:
     input:
         db=os.path.join(GENOMICS_DB_DIR, "cohort_db_{interval_id}"),
-        interval_list=lambda wildcards: os.path.join(INTERVALS_DIR, f'{wildcards.interval_id}-scattered.interval_list')
+        interval_list=os.path.join(INTERVALS_DIR, '{interval_id}-scattered.interval_list')
     output:
         os.path.join(FINAL_DIR, "genotyped_variants.interval_{interval_id}.vcf.gz")
     log:
         os.path.join(LOG_DIR, "genotype_gvcfs.{interval_id}.log")
-    threads: 1
+    threads: 2
     resources:
-        mem_mb=increment_memory(10000),
-        time='72:00:00',
+        mem_mb=increment_memory(20000),
+        time='96:00:00',
         tmpdir=SCRATCH_DIR
     conda:
         GATK_ENV
@@ -241,6 +275,8 @@ rule genotype_gvcfs:
           -R {REFERENCE_GENOME} \
           --variant-output-filtering STARTS_IN \
           --max-alternate-alleles 4 \
+          -G StandardAnnotation \
+          -G AS_StandardAnnotation \
           --use-new-qual-calculator \
           -V gendb://{input.db} \
           -O {output} \
@@ -273,7 +309,7 @@ rule merge_vcfs:
     threads: 2
     resources:
         mem_mb=20000,
-        time='72:00:00',
+        time='96:00:00',
         tmpdir=SCRATCH_DIR
     conda:
         GATK_ENV
