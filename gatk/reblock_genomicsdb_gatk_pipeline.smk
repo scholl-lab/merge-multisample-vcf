@@ -223,7 +223,7 @@ rule genomicsdb_import:
         db=directory(os.path.join(GENOMICS_DB_DIR, "cohort_db_{interval_id}"))
     log:
         os.path.join(LOG_DIR, "genomicsdb_import.{interval_id}.log")
-    threads: 2
+    threads: 3
     resources:
         mem_mb=increment_memory(40000),
         time='04:00:00',
@@ -239,8 +239,7 @@ rule genomicsdb_import:
           --sample-name-map {input.sample_map} \
           --genomicsdb-workspace-path {output.db} \
           --tmp-dir {resources.tmpdir} \
-          --reader-threads 1 \
-          --genomicsdb-shared-posixfs-optimizations true \
+          --reader-threads 2 \
           --batch-size 50 \
           --overwrite-existing-genomicsdb-workspace \
           -L {input.interval_list} &>> {log}
