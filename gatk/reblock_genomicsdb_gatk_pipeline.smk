@@ -226,7 +226,7 @@ rule genomicsdb_import:
     threads: 3
     resources:
         mem_mb=increment_memory(40000),
-        time='04:00:00',
+        time='48:00:00',
         tmpdir=SCRATCH_DIR
     conda:
         GATK_ENV
