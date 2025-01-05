@@ -187,7 +187,7 @@ rule merge_vcfs:
             -i {INFO_RULES} \
             -l {input} \
           | bcftools +fill-tags \
-          | bcftools view -Oz -o {output} -W tbi
+          | bcftools view -Oz -o {output} -W=tbi
         ) &>> {log}
 
         echo "Finished merge_vcfs {wildcards.idx} at: $(date)" >> {log}
@@ -257,7 +257,7 @@ rule final_merge:
             -l {input} \
             -0 \
           | bcftools +fill-tags \
-          | bcftools view -Oz -o {output} -W tbi
+          | bcftools view -Oz -o {output} -W=tbi
         ) &>> {log}
 
         echo "Finished final_merge at: $(date)" >> {log}
