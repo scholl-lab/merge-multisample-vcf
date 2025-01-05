@@ -28,9 +28,13 @@ CONDA_ENV = config["conda_env"]                  # Conda environment
 REFERENCE_FASTA = config["reference_fasta"]      # Reference FASTA for normalization
 
 # New Parameter: Final Output Name
-# Set a default value if 'final_output_name' is not provided
 FINAL_OUTPUT_NAME = config.get("final_output_name", "all_merged.vcf.gz")
-# ----------------------------------------------------------------------------------- #
+
+# New Parameter: Info rules for bcftools merge (from config)
+INFO_RULES = config.get("info_rules", "BaseQRankSum:avg,ExcessHet:avg,FS:avg,MQ:avg,MQRankSum:avg,QD:avg,"
+                                      "ReadPosRankSum:avg,SOR:avg,DP:avg,AF:sum,AS_BaseQRankSum:avg,"
+                                      "AS_FS:avg,AS_MQ:avg,AS_MQRankSum:avg,AS_QD:avg,AS_ReadPosRankSum:avg,"
+                                      "AS_SOR:avg,AS_UNIQ_ALT_READ_COUNT:avg,MLEAC:avg,MLEAF:avg,AN:sum,AC:sum")
 
 # ----------------------------------------------------------------------------------- #
 # OUTPUT ORGANIZATION:
@@ -41,7 +45,7 @@ NORMALIZED_DIR = prefix_results('normalized_vcfs')  # Directory for normalized V
 LISTS_DIR = prefix_results('lists')                # Directory for list files
 MERGE_DIR = prefix_results('merged_vcfs')          # Directory for merged VCFs
 FINAL_DIR = prefix_results('final')                # Directory for final merged VCF
-LOG_DIR = prefix_results('logs')                    # Directory for logs
+LOG_DIR = prefix_results('logs')                   # Directory for logs
 
 # Ensure all output directories exist.
 for output_dir in [NORMALIZED_DIR, LISTS_DIR, MERGE_DIR, FINAL_DIR, LOG_DIR]:
@@ -84,7 +88,6 @@ rule all:
         os.path.join(FINAL_DIR, FINAL_OUTPUT_NAME),
         # MD5 checksum for the final merged VCF
         os.path.join(FINAL_DIR, f"{FINAL_OUTPUT_NAME}.md5")
-        # You can add more checksum files here if needed
 
 # Rule to normalize each VCF file
 rule normalize_vcf:
@@ -110,7 +113,12 @@ rule normalize_vcf:
         fi
 
         echo "Starting normalization for {wildcards.sample} at $(date)" > {log}
-        bcftools norm -m-any --force -a --atom-overlaps . -W --threads {threads} -f {input.fasta} -Oz -o {output.normalized} {input.vcf} &>> {log}
+        bcftools norm \
+            -m-any --force -a --atom-overlaps . -W \
+            --threads {threads} \
+            -f {input.fasta} \
+            -Oz -o {output.normalized} \
+            {input.vcf} &>> {log}
         echo "Finished normalization for {wildcards.sample} at $(date)" >> {log}
         """
 
@@ -122,7 +130,6 @@ rule md5_normalized_vcf:
         md5=os.path.join(LOG_DIR, "{sample}.normalized.vcf.gz.md5")
     log:
         log_file=os.path.join(LOG_DIR, "md5_normalized.{sample}.log")
-    # Removed 'conda' directive as 'md5sum' is a standard utility
     shell:
         """
         echo "Computing MD5 for {input.normalized} at $(date)" > {log_file}
@@ -170,8 +177,19 @@ rule merge_vcfs:
     shell:
         """
         echo "Starting merge_vcfs {wildcards.idx} at: $(date)" >> {log}
-        bcftools merge --threads {threads} -F x -0 -m none -i BaseQRankSum:avg,ExcessHet:avg,FS:avg,MQ:avg,MQRankSum:avg,QD:avg,ReadPosRankSum:avg,SOR:avg,DP:avg,AF:sum,AS_BaseQRankSum:avg,AS_FS:avg,AS_MQ:avg,AS_MQRankSum:avg,AS_QD:avg,AS_ReadPosRankSum:avg,AS_SOR:avg,AS_UNIQ_ALT_READ_COUNT:avg,MLEAC:avg,MLEAF:avg,AN:sum,AC:sum -l {input} -Oz -o {output} &>> {log}
-        bcftools index --threads {threads} {output} &>> {log}
+
+        (
+          bcftools merge \
+            --threads {threads} \
+            -F x \
+            -0 \
+            -m none \
+            -i {INFO_RULES} \
+            -l {input} \
+          | bcftools +fill-tags \
+          | bcftools view -Oz -o {output} -W tbi
+        ) &>> {log}
+
         echo "Finished merge_vcfs {wildcards.idx} at: $(date)" >> {log}
         """
 
@@ -183,7 +201,6 @@ rule md5_merged_vcf:
         md5=os.path.join(LOG_DIR, "merge.{idx}.vcf.gz.md5")
     log:
         log_file=os.path.join(LOG_DIR, "md5_merge.{idx}.log")
-    # Removed 'conda' directive as 'md5sum' is a standard utility
     shell:
         """
         echo "Computing MD5 for {input.merged} at $(date)" > {log_file}
@@ -230,8 +247,19 @@ rule final_merge:
     shell:
         """
         echo "Starting final_merge at: $(date)" >> {log}
-        bcftools merge --threads {threads} -F x -m none -i BaseQRankSum:avg,ExcessHet:avg,FS:avg,MQ:avg,MQRankSum:avg,QD:avg,ReadPosRankSum:avg,SOR:avg,DP:avg,AF:sum,AS_BaseQRankSum:avg,AS_FS:avg,AS_MQ:avg,AS_MQRankSum:avg,AS_QD:avg,AS_ReadPosRankSum:avg,AS_SOR:avg,AS_UNIQ_ALT_READ_COUNT:avg,MLEAC:avg,MLEAF:avg,AN:sum,AC:sum -l {input} -0 -Oz -o {output} &>> {log}
-        bcftools index -t -f --threads {threads} {output} &>> {log}
+
+        (
+          bcftools merge \
+            --threads {threads} \
+            -F x \
+            -m none \
+            -i {INFO_RULES} \
+            -l {input} \
+            -0 \
+          | bcftools +fill-tags \
+          | bcftools view -Oz -o {output} -W tbi
+        ) &>> {log}
+
         echo "Finished final_merge at: $(date)" >> {log}
         """
 
@@ -243,11 +271,9 @@ rule md5_final_merge:
         md5=os.path.join(FINAL_DIR, f"{FINAL_OUTPUT_NAME}.md5")
     log:
         os.path.join(LOG_DIR, "md5_final_merge.log")
-    # Removed 'conda' directive as 'md5sum' is a standard utility
     shell:
         """
         echo "Computing MD5 for {input.merged} at $(date)" > {log}
         md5sum {input.merged} > {output.md5} 2>> {log}
         echo "Finished MD5 for {input.merged} at $(date)" >> {log}
         """
-# ----------------------------------------------------------------------------------- #
