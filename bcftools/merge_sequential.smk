@@ -160,7 +160,7 @@ rule merge_vcfs:
         os.path.join(MERGE_DIR, "merge.{idx}.vcf.gz")
     log:
         os.path.join(LOG_DIR, "merge.{idx}.log")
-    threads: 8
+    threads: 4
     resources:
         mem_mb = get_mem_from_threads,
         time = '24:00:00',
@@ -170,7 +170,7 @@ rule merge_vcfs:
     shell:
         """
         echo "Starting merge_vcfs {wildcards.idx} at: $(date)" >> {log}
-        bcftools merge --threads {threads} -0 -l -m none -i BaseQRankSum:avg,ExcessHet:avg,FS:avg,MQ:avg,MQRankSum:avg,QD:avg,ReadPosRankSum:avg,SOR:avg,DP:avg,AF:sum,AS_BaseQRankSum:avg,AS_FS:avg,AS_MQ:avg,AS_MQRankSum:avg,AS_QD:avg,AS_ReadPosRankSum:avg,AS_SOR:avg,AS_UNIQ_ALT_READ_COUNT:avg,MLEAC:avg,MLEAF:avg,AN:sum,AC:sum {input} -Oz -o {output} &>> {log}
+        bcftools merge --threads {threads} -F x -0 -m none -i BaseQRankSum:avg,ExcessHet:avg,FS:avg,MQ:avg,MQRankSum:avg,QD:avg,ReadPosRankSum:avg,SOR:avg,DP:avg,AF:sum,AS_BaseQRankSum:avg,AS_FS:avg,AS_MQ:avg,AS_MQRankSum:avg,AS_QD:avg,AS_ReadPosRankSum:avg,AS_SOR:avg,AS_UNIQ_ALT_READ_COUNT:avg,MLEAC:avg,MLEAF:avg,AN:sum,AC:sum -l {input} -Oz -o {output} &>> {log}
         bcftools index --threads {threads} {output} &>> {log}
         echo "Finished merge_vcfs {wildcards.idx} at: $(date)" >> {log}
         """
@@ -220,7 +220,7 @@ rule final_merge:
         os.path.join(FINAL_DIR, FINAL_OUTPUT_NAME)
     log:
         os.path.join(LOG_DIR, "final_merge.log")
-    threads: 8
+    threads: 4
     resources:
         mem_mb = get_mem_from_threads,
         time = '24:00:00',
@@ -230,7 +230,7 @@ rule final_merge:
     shell:
         """
         echo "Starting final_merge at: $(date)" >> {log}
-        bcftools merge --threads {threads} -l -m none -i BaseQRankSum:avg,ExcessHet:avg,FS:avg,MQ:avg,MQRankSum:avg,QD:avg,ReadPosRankSum:avg,SOR:avg,DP:avg,AF:sum,AS_BaseQRankSum:avg,AS_FS:avg,AS_MQ:avg,AS_MQRankSum:avg,AS_QD:avg,AS_ReadPosRankSum:avg,AS_SOR:avg,AS_UNIQ_ALT_READ_COUNT:avg,MLEAC:avg,MLEAF:avg,AN:sum,AC:sum {input} -0 -Oz -o {output} &>> {log}
+        bcftools merge --threads {threads} -F x -m none -i BaseQRankSum:avg,ExcessHet:avg,FS:avg,MQ:avg,MQRankSum:avg,QD:avg,ReadPosRankSum:avg,SOR:avg,DP:avg,AF:sum,AS_BaseQRankSum:avg,AS_FS:avg,AS_MQ:avg,AS_MQRankSum:avg,AS_QD:avg,AS_ReadPosRankSum:avg,AS_SOR:avg,AS_UNIQ_ALT_READ_COUNT:avg,MLEAC:avg,MLEAF:avg,AN:sum,AC:sum -l {input} -0 -Oz -o {output} &>> {log}
         bcftools index -t -f --threads {threads} {output} &>> {log}
         echo "Finished final_merge at: $(date)" >> {log}
         """
