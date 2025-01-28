@@ -160,6 +160,7 @@ rule split_vcfs:
                 log_file.write(f"Finished split_vcfs subset {idx} at: {datetime.now()}\n")
 
 # Rule to merge subsets of normalized VCFs
+# using the -m none option we avoid merging multiallelic sites and having to normalize again
 rule merge_vcfs:
     input:
         os.path.join(LISTS_DIR, "subset_vcfs.{idx}")
