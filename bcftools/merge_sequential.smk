@@ -36,6 +36,10 @@ INFO_RULES = config.get("info_rules", "BaseQRankSum:avg,ExcessHet:avg,FS:avg,MQ:
                                       "AS_FS:avg,AS_MQ:avg,AS_MQRankSum:avg,AS_QD:avg,AS_ReadPosRankSum:avg,"
                                       "AS_SOR:avg,AS_UNIQ_ALT_READ_COUNT:avg,MLEAC:avg,MLEAF:avg,AN:sum,AC:sum")
 
+# New Parameter: Filter logic for bcftools merge (-F x|+)
+# Default is "x" if not specified in config.yaml
+FINAL_FILTER_LOGIC = config.get("final_filter_logic", "x")
+
 # ----------------------------------------------------------------------------------- #
 # OUTPUT ORGANIZATION:
 prefix_results = functools.partial(os.path.join, OUTPUT_FOLDER)
@@ -252,7 +256,7 @@ rule final_merge:
         (
           bcftools merge \
             --threads {threads} \
-            -F x \
+            -F {FINAL_FILTER_LOGIC} \
             -m none \
             -i {INFO_RULES} \
             -l {input} \
