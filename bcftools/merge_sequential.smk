@@ -186,7 +186,7 @@ rule merge_vcfs:
         (
           bcftools merge \
             --threads {threads} \
-            -F x \
+            -F {FINAL_FILTER_LOGIC} \
             -0 \
             -m none \
             -i {INFO_RULES} \
