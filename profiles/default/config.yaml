@@ -1,0 +1,49 @@
+# Default workflow profile — ships with the repo.
+# Loaded via --workflow-profile profiles/default.
+#
+# Sets resource defaults and per-rule overrides that apply on every cluster.
+# Cluster-specific settings (executor, account, partition) go in a separate
+# --profile: profiles/bih/ or profiles/charite/.
+
+latency-wait: 60
+rerun-incomplete: true
+retries: 2
+printshellcmds: true
+
+software-deployment-method:
+  - conda
+
+# Shared-filesystem assumptions (typical HPC with Lustre/GPFS/NFS)
+shared-fs-usage:
+  - persistence
+  - software-deployment
+  - sources
+  - source-cache
+  - input-output
+
+default-resources:
+  mem_mb: 4000
+  runtime: 120
+
+# Thread counts per rule
+set-threads:
+  normalize_vcf: 4
+  merge_vcfs: 4
+  final_merge: 4
+
+# Per-rule resource overrides.
+# cpus_per_task mirrors set-threads as a workaround for
+# snakemake-executor-plugin-slurm#210 (threads not forwarded to --cpus-per-task).
+# mem_mb is intentionally absent from set-resources so the retry-doubling
+# callable defined in each rule (mem_mb(base)) remains in effect.
+# default-resources above provides the fallback for any rule that omits it.
+set-resources:
+  normalize_vcf:
+    runtime: 120       # minutes; 2 h is ample for a single-sample norm
+    cpus_per_task: 4
+  merge_vcfs:
+    runtime: 1440      # 24 h; scales with batch size
+    cpus_per_task: 4
+  final_merge:
+    runtime: 1440      # 24 h
+    cpus_per_task: 4

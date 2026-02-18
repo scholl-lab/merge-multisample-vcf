@@ -1,0 +1,48 @@
+# merge-multisample-vcf — configuration template
+# Copy this file to config/config.yaml and fill in your paths.
+# config/config.yaml is gitignored so credentials and absolute paths
+# are never committed.
+
+# ---------------------------------------------------------------------------
+# Required
+# ---------------------------------------------------------------------------
+
+# Path to a plain-text file listing input VCFs, one absolute path per line.
+# Blank lines and lines starting with '#' are ignored.
+vcf_list_file: "input/input.list"
+
+# Number of VCFs merged in each intermediate batch.
+# Keep below ~1000 (bcftools merge positional-argument limit).
+# Larger batches use more RAM; smaller batches create more intermediate files.
+vcfs_per_batch: 100
+
+# Root directory for all pipeline outputs.
+output_folder: "results"
+
+# Reference FASTA for bcftools norm (must be bgzipped + indexed, or plain FASTA).
+reference_fasta: "/path/to/reference.fa"
+
+# ---------------------------------------------------------------------------
+# Optional — defaults shown
+# ---------------------------------------------------------------------------
+
+# File extension to strip when deriving sample names from VCF basenames.
+# Change to ".g.vcf.gz" if input files use that suffix.
+vcf_suffix: ".vcf.gz"
+
+# Name of the final merged output file placed in {output_folder}/final/.
+final_output_name: "all_merged.vcf.gz"
+
+# FILTER field merging logic for bcftools merge -F:
+#   "x"  — record is PASS if *any* input sample passes  (default, more permissive)
+#   "+"  — record is PASS only if *all* input samples pass (more strict)
+final_filter_logic: "x"
+
+# Comma-separated INFO field aggregation rules passed to bcftools merge -i.
+# Each entry is FIELD:OPERATION where OPERATION is one of:
+#   avg, sum, min, max, 1, ., etc. (see bcftools merge --info-rules).
+info_rules: >-
+  BaseQRankSum:avg,ExcessHet:avg,FS:avg,MQ:avg,MQRankSum:avg,QD:avg,
+  ReadPosRankSum:avg,SOR:avg,DP:avg,AF:sum,AS_BaseQRankSum:avg,
+  AS_FS:avg,AS_MQ:avg,AS_MQRankSum:avg,AS_QD:avg,AS_ReadPosRankSum:avg,
+  AS_SOR:avg,AS_UNIQ_ALT_READ_COUNT:avg,MLEAC:avg,MLEAF:avg,AN:sum,AC:sum

@@ -1,0 +1,67 @@
+# =============================================================================
+# pyproject.toml — tool configuration for merge-multisample-vcf
+# =============================================================================
+# Install dev tools:  pip install ruff mypy snakefmt shellcheck-py
+
+[project]
+name = "merge-multisample-vcf"
+version = "0.2.0"
+requires-python = ">=3.10"
+
+# ---------------------------------------------------------------------------
+# Ruff  (linter + formatter for Python)
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py310"
+line-length = 99
+src = ["scripts", "workflow/rules", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "RUF", # ruff-specific
+]
+ignore = [
+    "E501",   # line too long — handled by formatter
+    "SIM108", # ternary operator — readability preference
+    "SIM102", # nested if — keep for readability with comments
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["scripts"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# ---------------------------------------------------------------------------
+# Mypy  (type checker)
+# ---------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_configs = true
+warn_return_any = true
+warn_unused_ignores = true
+check_untyped_defs = true
+
+# ---------------------------------------------------------------------------
+# Pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["dryrun: snakemake subprocess tests (may require snakemake installed)"]
+
+# ---------------------------------------------------------------------------
+# Snakefmt  (Snakemake formatter)
+# ---------------------------------------------------------------------------
+[tool.snakefmt]
+line_length = 99
+include = 'workflow/.*\.(smk|rules)$|workflow/Snakefile$'

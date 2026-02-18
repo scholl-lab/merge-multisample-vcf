@@ -1,0 +1,17 @@
+# Charité HPC cluster — SLURM executor plugin profile.
+# Loaded automatically by scripts/run_snakemake.sh when on Charité hardware.
+#
+# Key Charité constraints:
+#   - Max walltime: 2 days (2880 min) on all partitions
+#   - Conda requires: source /etc/profile.d/conda.sh (handled by launcher)
+#
+# Requires: pip install snakemake-executor-plugin-slurm
+executor: slurm
+jobs: 50
+latency-wait: 60
+
+default-resources:
+  slurm_partition: compute
+  slurm_account: sc-users
+  mem_mb_per_cpu: 4400
+  runtime: 120
