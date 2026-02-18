@@ -64,7 +64,7 @@ merge-multisample-vcf/
 │   └── run_snakemake.sh            ✅ detect_cluster() BIH/Charité/local, TMPDIR+EXIT trap,
 │                                      --workflow-profile + --profile, "$@" passthrough
 ├── deprecated/gatk/                ✅ Archived (moved from gatk/), DEPRECATED.md added
-├── bcftools/merge_sequential.smk   ✅ Kept unchanged as legacy fallback
+├── bcftools/                       ❌ Deleted — superseded by workflow/; v0.1.0 tag is the safety net
 ├── .gitignore                      ✅ Fixed: path-specific ignores + !profiles/**/config.yaml
 ├── CLAUDE.md                       ✅ Rewritten for new layout
 └── README.md                       ✅ Rewritten: overview, quick-start, config table,

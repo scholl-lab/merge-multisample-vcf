@@ -64,8 +64,11 @@ DEFAULT_INFO_RULES = (
 # ---------------------------------------------------------------------------
 
 
-def discover_vcf_files(vcf_folder: str | Path) -> list[dict[str, Any]]:
-    """Scan a directory for *.vcf.gz files.
+def discover_vcf_files(
+    vcf_folder: str | Path,
+    suffix: str = ".vcf.gz",
+) -> list[dict[str, Any]]:
+    """Scan a directory for VCF files matching *suffix*.
 
     Returns a list of dicts with keys: path, basename, size_bytes.
     """
@@ -74,12 +77,12 @@ def discover_vcf_files(vcf_folder: str | Path) -> list[dict[str, Any]]:
         sys.exit(f"Error: VCF directory does not exist: {folder}")
 
     entries = []
-    for vcf in sorted(folder.glob("*.vcf.gz")):
+    for vcf in sorted(folder.glob(f"*{suffix}")):
         if vcf.is_file():
             entries.append(
                 {
                     "path": str(vcf.resolve()),
-                    "basename": vcf.name.removesuffix(".vcf.gz"),
+                    "basename": vcf.name.removesuffix(suffix),
                     "size_bytes": vcf.stat().st_size,
                 }
             )
@@ -431,13 +434,14 @@ def _interactive_wizard() -> None:
 
     # ---- Step 1: VCF input ----
     print("Step 1: VCF input")
-    print("  [1] Scan a directory for *.vcf.gz files")
+    print("  [1] Scan a directory for VCF files")
     print("  [2] Use an existing VCF list file")
     choice = _prompt("  Choice", default="1")
 
     vcf_paths: list[str] = []
     vcf_list_file: str = ""
     write_list = False
+    vcf_suffix = ".vcf.gz"  # may be overridden in the scanning branch below
 
     if choice == "2":
         # Existing list file
@@ -446,18 +450,19 @@ def _interactive_wizard() -> None:
         vcf_list_file = str(Path(list_path_str).resolve())
         print(f"\n  Loaded {len(vcf_paths)} path(s) from {vcf_list_file}")
     else:
-        # Scan directory
+        # Ask for suffix before scanning so the glob matches the right files
+        vcf_suffix = _prompt("  VCF suffix to scan for", default=".vcf.gz")
         vcf_folder_str = _prompt_path("  VCF directory to scan")
-        entries = discover_vcf_files(vcf_folder_str)
+        entries = discover_vcf_files(vcf_folder_str, suffix=vcf_suffix)
         if not entries:
-            print(f"\n  No *.vcf.gz files found in: {vcf_folder_str}")
+            print(f"\n  No *{vcf_suffix} files found in: {vcf_folder_str}")
             if not _prompt_yn("  Continue anyway?", default=False):
                 print("Aborted.")
                 return
         else:
             print(f"\n  Found {len(entries)} VCF file(s):")
             for e in entries[:10]:
-                print(f"    {e['basename']}.vcf.gz  ({format_size(e['size_bytes'])})")
+                print(f"    {e['basename']}{vcf_suffix}  ({format_size(e['size_bytes'])})")
             if len(entries) > 10:
                 print(f"    ... and {len(entries) - 10} more")
         print()
@@ -507,7 +512,7 @@ def _interactive_wizard() -> None:
 
     # ---- Step 5: Optional settings ----
     print("Step 5: Optional settings (press Enter to accept defaults)")
-    vcf_suffix = _prompt("  vcf_suffix", default=".vcf.gz")
+    vcf_suffix = _prompt("  vcf_suffix", default=vcf_suffix)
     final_output_name = _prompt("  final_output_name", default="all_merged.vcf.gz")
     print("  final_filter_logic:")
     final_filter_logic = _prompt_choice("filter logic", choices=["x", "+"], default="x")
@@ -679,15 +684,15 @@ Examples:
     vcf_list_file: str
 
     if args.vcf_folder:
-        entries = discover_vcf_files(args.vcf_folder)
+        entries = discover_vcf_files(args.vcf_folder, suffix=args.vcf_suffix)
         if not entries:
-            sys.exit(f"Error: No *.vcf.gz files found in: {args.vcf_folder}")
+            sys.exit(f"Error: No *{args.vcf_suffix} files found in: {args.vcf_folder}")
         vcf_paths = [e["path"] for e in entries]
         vcf_list_file = str(Path(args.list_output).resolve())
 
         print(f"Found {len(entries)} VCF file(s) in {args.vcf_folder}")
         for e in entries[:5]:
-            print(f"  {e['basename']}.vcf.gz  ({format_size(e['size_bytes'])})")
+            print(f"  {e['basename']}{args.vcf_suffix}  ({format_size(e['size_bytes'])})")
         if len(entries) > 5:
             print(f"  ... and {len(entries) - 5} more")
 

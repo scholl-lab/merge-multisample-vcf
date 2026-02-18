@@ -34,16 +34,16 @@ set-threads:
 # Per-rule resource overrides.
 # cpus_per_task mirrors set-threads as a workaround for
 # snakemake-executor-plugin-slurm#210 (threads not forwarded to --cpus-per-task).
+# mem_mb is intentionally absent from set-resources so the retry-doubling
+# callable defined in each rule (mem_mb(base)) remains in effect.
+# default-resources above provides the fallback for any rule that omits it.
 set-resources:
   normalize_vcf:
-    mem_mb: 4000
     runtime: 120       # minutes; 2 h is ample for a single-sample norm
     cpus_per_task: 4
   merge_vcfs:
-    mem_mb: 8000
     runtime: 1440      # 24 h; scales with batch size
     cpus_per_task: 4
   final_merge:
-    mem_mb: 16000
     runtime: 1440      # 24 h
     cpus_per_task: 4

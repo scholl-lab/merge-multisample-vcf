@@ -24,8 +24,13 @@ def load_vcf_list(
 
     Raises ``ValueError`` if any two entries resolve to the same sample name.
     """
+    paths: list[str] = []
     with open(path) as fh:
-        paths = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
+        for line in fh:
+            stripped = line.strip()
+            if not stripped or stripped.startswith("#"):
+                continue
+            paths.append(stripped)
 
     samples: list[str] = []
     sample_to_path: dict[str, str] = {}

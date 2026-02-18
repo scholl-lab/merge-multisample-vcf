@@ -34,8 +34,19 @@ detect_cluster() {
 }
 
 CLUSTER=$(detect_cluster)
-CONFIG_FILE="${1:-config/config.yaml}"
-shift 1 2>/dev/null || true
+
+# Consume the first argument as CONFIG_FILE only when it looks like a config
+# file (ends in .yaml/.yml or is an existing path) and does not start with '-'.
+# This allows passing flags directly: bash run_snakemake.sh --dry-run
+CONFIG_FILE="config/config.yaml"
+if [[ $# -gt 0 ]]; then
+    first_arg="${1-}"
+    if [[ "$first_arg" != -* ]] && \
+       [[ "$first_arg" == *.yaml || "$first_arg" == *.yml || -f "$first_arg" ]]; then
+        CONFIG_FILE="$first_arg"
+        shift
+    fi
+fi
 
 # ---------------------------------------------------------------------------
 # Conda activation (Charité requires explicit sourcing)
