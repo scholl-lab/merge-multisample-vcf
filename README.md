@@ -1,70 +1,137 @@
-# VCF Merge Sequential Pipeline
+# merge-multisample-vcf
 
-## Overview
+Snakemake 8 pipeline for normalising and merging large multi-sample VCF cohorts
+using **bcftools**.  Handles cohorts too large for a single `bcftools merge` call
+(> ~1 000 files) by batching in two stages.
 
-This repository contains a pipeline designed to process VCF files by splitting them into manageable subsets, merging them, and then creating a single merged VCF file using `bcftools`.
+## Pipeline overview
 
-## Contents
-
-- `merge_sequential.smk`: The main Snakemake script for the pipeline.
-- `config_dummy.yaml`: Configuration file dummy that stores parameters and settings for the pipeline.
-- `run_merge_sequential.sh`: A scheduler shell script to run the Snakemake pipeline on a Slurm scheduler.
-
-## Setup
-
-### Configuration
-
-Before running the pipeline, you need to set up the `config.yaml` file:
-
-```yaml
-vcf_folder: "/path/to/vcf/files"
-output_folder: "/desired/output/folder"
-vcfs_per_batch: 500
-conda_env: "bcftools"
+```
+input VCFs (one per sample)
+       │
+       ▼
+ normalize_vcf          — bcftools norm: left-align, split multiallelic, index
+       │
+       ▼  (batches of vcfs_per_batch)
+  merge_vcfs             — bcftools merge | +fill-tags | view (per batch)
+       │
+       ▼
+  final_merge            — bcftools merge | +fill-tags | view (all batches)
+       │
+       ▼
+ {output_folder}/final/{final_output_name}  +  .tbi  +  .md5
 ```
 
-- `vcf_folder`: The path to the directory containing your `.vcf.gz` files.
-- `output_folder`: The desired directory where the results will be saved.
-- `vcfs_per_batch`: The number of VCFs processed in each batch.
-- `conda_env`: The name of the Conda environment to be used, which must have `bcftools` installed.
+Intermediate VCFs are automatically removed (`temp()`) once consumed.
+Run with `--notemp` to keep them for debugging.
 
-### Conda Environment
+## Quick start
 
-Ensure that the specified Conda environment in the `config.yaml` file contains `bcftools`. 
-
-## Running the Pipeline
-
-### Directly with Snakemake
-
-If you have Snakemake installed, you can run the pipeline directly:
+**1. Copy and edit the config template:**
 
 ```bash
-snakemake -s merge_sequential.smk --use-conda
+cp config/config_dummy.yaml config/config.yaml
+# Edit config/config.yaml — at minimum set vcf_list_file and reference_fasta
 ```
 
-### With Slurm Scheduler
+**2. Create the VCF list file** (one absolute path per line, blank lines and `#` comments ignored):
 
-To run the pipeline on a system with the Slurm scheduler, use the provided shell script:
+```
+/data/cohort/sample1.vcf.gz
+/data/cohort/sample2.vcf.gz
+...
+```
+
+**3. Run locally (dry-run first):**
 
 ```bash
-sbatch run_merge_sequential.sh
+snakemake -s workflow/Snakefile \
+          --configfile config/config.yaml \
+          --workflow-profile profiles/default \
+          --profile profiles/local \
+          --dry-run
+
+# Remove --dry-run to execute
 ```
 
-The script sets up necessary temporary directories, logs, and other parameters before invoking Snakemake. The logs for the Snakemake jobs are saved in the `slurm_logs` directory.
+**4. Run on an HPC cluster (BIH/Charité via Slurm):**
 
-## Logging
+```bash
+sbatch scripts/run_snakemake.sh                         # uses config/config.yaml
+sbatch scripts/run_snakemake.sh config/my_config.yaml   # custom config
+```
 
-The script logs the start and end times of each rule to facilitate performance profiling and troubleshooting. Log files are stored in the directory specified under `log_subfolder` in the configuration file.
+The script auto-detects the cluster (BIH or Charité) and loads the matching profile.
 
-## Contribution
+## Configuration
 
-Feel free to fork the repository and submit pull requests for any enhancements or bug fixes. Contributions to improve the script or documentation are welcome.
+Copy `config/config_dummy.yaml` to `config/config.yaml` (gitignored) and set:
 
-## TODO
+| Parameter | Required | Default | Description |
+|-----------|----------|---------|-------------|
+| `vcf_list_file` | ✓ | — | Path to file listing input VCFs (one per line) |
+| `reference_fasta` | ✓ | — | Reference FASTA for `bcftools norm` |
+| `output_folder` | ✓ | — | Root output directory |
+| `vcfs_per_batch` | ✓ | — | Samples per intermediate batch (keep ≤ 1 000) |
+| `vcf_suffix` | | `.vcf.gz` | Extension stripped to derive sample names |
+| `final_output_name` | | `all_merged.vcf.gz` | Final output filename |
+| `final_filter_logic` | | `x` | `x` = PASS if any sample passes; `+` = all must pass |
+| `info_rules` | | *(GATK defaults)* | `FIELD:OPERATION` pairs for `bcftools merge -i` |
 
-- Implement md5sum calculation for all files to verify data integrity.
-- Remove intermediate files to save storage space.
-- Ensure proper sequence of index and VCF file creation to maintain organization.
-- Add error handling to manage potential issues gracefully, such as missing input files or unsuccessful command executions.
-- Consider making the file extensions configurable to allow for more flexible input.
-- Explore options for dynamic memory allocation based on the number of threads, possibly through a configuration setting or automatic calculation.
+See `config/config_dummy.yaml` for full documentation and the default `info_rules` string.
+
+## Output structure
+
+```
+{output_folder}/
+├── normalized_vcfs/        per-sample normalised VCFs (temp — auto-deleted)
+├── merged_vcfs/            per-batch merged VCFs      (temp — auto-deleted)
+├── final/
+│   ├── {final_output_name}       final cohort VCF
+│   ├── {final_output_name}.tbi   tabix index
+│   └── {final_output_name}.md5   MD5 checksum
+└── logs/
+    ├── normalize_vcf.{sample}.log
+    ├── merge_vcfs.{idx}.log
+    ├── final_merge.log
+    ├── {sample}.normalized.vcf.gz.md5   per-sample checksums
+    ├── merge.{idx}.vcf.gz.md5           per-batch checksums
+    └── benchmarks/                       Snakemake timing TSVs
+```
+
+## Keeping intermediate files
+
+By default all intermediate VCFs are deleted after use.
+To keep them (e.g. to re-run only the final merge stage):
+
+```bash
+snakemake ... --notemp
+```
+
+## Profiles
+
+| Profile | Purpose |
+|---------|---------|
+| `profiles/default/` | Resource defaults — always loaded via `--workflow-profile` |
+| `profiles/bih/` | BIH HPC SLURM settings (auto-selected by launcher) |
+| `profiles/charite/` | Charité HPC SLURM settings (auto-selected by launcher) |
+| `profiles/local/` | Local execution (low parallelism, short latency-wait) |
+
+Cluster profiles require `snakemake-executor-plugin-slurm`:
+```bash
+pip install snakemake-executor-plugin-slurm
+```
+
+## Conda environment
+
+The pipeline uses `workflow/envs/bcftools.yaml` (bcftools + htslib ≥ 1.18).
+Snakemake creates and caches the environment automatically when
+`software-deployment-method: conda` is set in the profile (default).
+
+## Legacy pipeline
+
+The original single-file pipeline (`bcftools/merge_sequential.smk`) is kept for
+reference and backward compatibility with existing Snakemake < 8 setups.
+
+The GATK joint-genotyping pipeline has been archived to `deprecated/gatk/`
+due to unresolved indexing bugs; see `deprecated/gatk/DEPRECATED.md`.
