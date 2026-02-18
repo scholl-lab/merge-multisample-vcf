@@ -1,0 +1,4 @@
+# Local execution profile — for development, testing, or small datasets.
+# Usage: snakemake --workflow-profile profiles/default --profile profiles/local
+jobs: 4
+latency-wait: 5

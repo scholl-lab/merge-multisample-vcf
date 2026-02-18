@@ -1,0 +1,12 @@
+# BIH HPC (cubi) — SLURM executor plugin profile.
+# Loaded automatically by scripts/run_snakemake.sh when on BIH hardware.
+# Requires: pip install snakemake-executor-plugin-slurm
+executor: slurm
+jobs: 200
+latency-wait: 60
+
+default-resources:
+  slurm_partition: medium
+  slurm_account: scholl-lab
+  mem_mb_per_cpu: 4400
+  runtime: 120

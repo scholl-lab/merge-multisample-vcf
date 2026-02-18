@@ -1,5 +1,11 @@
-# vs code settings
+# IDE settings
 .vscode/
 
-# the config file
+# Live user configs — contain absolute paths and are never committed.
+# Use config/config_dummy.yaml or bcftools/config_dummy.yaml as templates.
 config.yaml
+bcftools/config.yaml
+gatk/config.yaml
+
+# Profile configs ARE committed (they carry no user-specific data).
+!profiles/**/config.yaml
