@@ -33,7 +33,12 @@ detect_cluster() {
     fi
 }
 
-CLUSTER=$(detect_cluster)
+# Allow explicit override: CLUSTER_TYPE=bih bash scripts/run_snakemake.sh
+if [[ -n "${CLUSTER_TYPE:-}" ]]; then
+    CLUSTER="${CLUSTER_TYPE}"
+else
+    CLUSTER=$(detect_cluster)
+fi
 
 # Consume the first argument as CONFIG_FILE only when it looks like a config
 # file (ends in .yaml/.yml or is an existing path) and does not start with '-'.

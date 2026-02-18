@@ -100,7 +100,7 @@ rule merge_vcfs:
             --threads {threads} \
             -F {params.filter_logic} \
             -0 -m none \
-            -i '{params.info_rules}' \
+            -i {params.info_rules:q} \
             {input.vcfs} \
           | bcftools +fill-tags \
           | bcftools view --threads {threads} -Oz -o {output.vcf} -W=tbi
@@ -156,7 +156,7 @@ rule final_merge:
             --threads {threads} \
             -F {params.filter_logic} \
             -0 -m none \
-            -i '{params.info_rules}' \
+            -i {params.info_rules:q} \
             {input.vcfs} \
           | bcftools +fill-tags \
           | bcftools view --threads {threads} -Oz -o {output.vcf} -W=tbi

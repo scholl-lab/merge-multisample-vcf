@@ -468,6 +468,10 @@ def _interactive_wizard() -> None:
         print()
 
         vcf_paths = [e["path"] for e in entries]
+        if not vcf_paths:
+            print("  No VCF files were provided. Cannot generate a functional config.")
+            print("  Aborting. Please rerun with a valid directory or VCF list.")
+            return
         default_list = "input/input.list"
         list_out = _prompt("  Save VCF paths to list file", default=default_list)
         vcf_list_file = str(Path(list_out).resolve())

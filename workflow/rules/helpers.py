@@ -32,6 +32,12 @@ def load_vcf_list(
                 continue
             paths.append(stripped)
 
+    if not paths:
+        raise ValueError(
+            f"VCF list file {path!r} contains no valid entries "
+            "(all lines are blank or comments)."
+        )
+
     samples: list[str] = []
     sample_to_path: dict[str, str] = {}
 

@@ -25,6 +25,28 @@ VCF_SUFFIX = config.get("vcf_suffix", ".vcf.gz")
 FINAL_OUTPUT_NAME = config.get("final_output_name", "all_merged.vcf.gz")
 FINAL_FILTER_LOGIC = config.get("final_filter_logic", "x")
 
+# Validate config values at parse time for clear, early error messages.
+if not os.path.isfile(VCF_LIST_FILE):
+    sys.exit(
+        f"ERROR: vcf_list_file={VCF_LIST_FILE!r} does not exist. " "Update config/config.yaml."
+    )
+if not os.path.isfile(REFERENCE_FASTA):
+    sys.exit(
+        f"ERROR: reference_fasta={REFERENCE_FASTA!r} does not exist. " "Update config/config.yaml."
+    )
+if VCFS_PER_BATCH <= 0:
+    sys.exit(
+        f"ERROR: vcfs_per_batch={VCFS_PER_BATCH!r} must be a positive integer. "
+        "Update config/config.yaml."
+    )
+_VALID_FILTER_LOGIC = {"x", "+"}
+if FINAL_FILTER_LOGIC not in _VALID_FILTER_LOGIC:
+    sys.exit(
+        f"ERROR: final_filter_logic={FINAL_FILTER_LOGIC!r} is not valid; "
+        f"allowed values: {sorted(_VALID_FILTER_LOGIC)}. "
+        "Update config/config.yaml."
+    )
+
 INFO_RULES = config.get(
     "info_rules",
     (
