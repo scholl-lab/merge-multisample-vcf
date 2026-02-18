@@ -1,0 +1,30 @@
+"""merge-multisample-vcf: normalise, batch-merge, and combine large VCF cohorts.
+
+Requires Snakemake 8.0+.
+"""
+
+from snakemake.utils import min_version
+
+min_version("8.0")
+
+
+# -- Configuration -----------------------------------------------------------
+configfile: "config/config.yaml"
+
+
+# -- Wildcard constraints ----------------------------------------------------
+wildcard_constraints:
+    sample="[A-Za-z0-9_.+-]+",
+    idx="[0-9]+",
+
+
+# -- Includes ----------------------------------------------------------------
+include: "rules/common.smk"
+include: "rules/merge.smk"
+
+
+# -- Target rule -------------------------------------------------------------
+rule all:
+    localrule: True
+    input:
+        get_final_outputs(),
