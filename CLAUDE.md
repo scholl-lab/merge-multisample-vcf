@@ -53,8 +53,6 @@ profiles/
 └── local/config.yaml          Local execution
 scripts/
 └── run_snakemake.sh           Cluster-auto-detecting Slurm launcher
-bcftools/
-└── merge_sequential.smk       Legacy single-file pipeline (Snakemake <8)
 deprecated/gatk/               Archived GATK pipeline (non-functional)
 .planning/PLAN.md              Implementation plan
 ```
@@ -97,7 +95,6 @@ When making changes, read in this order:
 | `final_filter_logic` | str | `x` or `+` (bcftools merge -F) |
 | `info_rules` | str | Comma-separated `FIELD:OP` pairs (bcftools merge -i) |
 
-## Deprecated / legacy
+## Archived pipelines
 
-- `bcftools/merge_sequential.smk` — original monolithic Snakefile, kept for backward compatibility. Do not add features here.
 - `deprecated/gatk/` — GATK joint-genotyping pipeline, archived 2026-02-18 due to fatal `.tbi` indexing bugs. See `deprecated/gatk/DEPRECATED.md`.

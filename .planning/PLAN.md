@@ -148,13 +148,13 @@ Earlier preparation commits (on `main` before branch):
 
 ---
 
-## Files not modified (as planned)
+## Files deleted (post-implementation cleanup)
 
 | File | Status |
 |------|--------|
-| `bcftools/merge_sequential.smk` | Untouched — legacy fallback |
-| `bcftools/run_merge_sequential.sh` | Untouched — legacy fallback |
-| `bcftools/config_dummy.yaml` | Untouched — superseded by `config/config_dummy.yaml` |
+| `bcftools/merge_sequential.smk` | Deleted — fully superseded by `workflow/`; `v0.1.0` tag on `main` serves as safety net |
+| `bcftools/run_merge_sequential.sh` | Deleted — same |
+| `bcftools/config_dummy.yaml` | Deleted — superseded by `config/config_dummy.yaml` |
 | `deprecated/gatk/*` | Untouched — archived |
 
 ---

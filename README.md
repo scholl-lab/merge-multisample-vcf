@@ -128,10 +128,7 @@ The pipeline uses `workflow/envs/bcftools.yaml` (bcftools + htslib ≥ 1.18).
 Snakemake creates and caches the environment automatically when
 `software-deployment-method: conda` is set in the profile (default).
 
-## Legacy pipeline
-
-The original single-file pipeline (`bcftools/merge_sequential.smk`) is kept for
-reference and backward compatibility with existing Snakemake < 8 setups.
+## Archived pipelines
 
 The GATK joint-genotyping pipeline has been archived to `deprecated/gatk/`
 due to unresolved indexing bugs; see `deprecated/gatk/DEPRECATED.md`.
