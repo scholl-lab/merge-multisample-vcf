@@ -165,9 +165,7 @@ def _find_genome_fastas(search_dir: Path) -> list[dict[str, Any]]:
             if not fasta.is_file() or fasta.name.startswith("."):
                 continue
             has_fai = Path(str(fasta) + ".fai").is_file()
-            has_dict = fasta.with_suffix(".dict").is_file() or Path(
-                str(fasta) + ".dict"
-            ).is_file()
+            has_dict = fasta.with_suffix(".dict").is_file() or Path(str(fasta) + ".dict").is_file()
             results.append(
                 {
                     "path": str(fasta),
@@ -403,7 +401,7 @@ def _prompt_choice(prompt: str, choices: list[str], default: str) -> str:
                 return choices[idx]
         if raw in choices:
             return raw
-        print(f"  Invalid — enter 1–{len(choices)} or a value from the list.")
+        print(f"  Invalid — enter 1-{len(choices)} or a value from the list.")
 
 
 def format_size(size_bytes: int) -> str:
@@ -500,7 +498,9 @@ def _interactive_wizard() -> None:
             reference_fasta = _prompt_path("  Path to reference FASTA", must_exist=False)
     else:
         print("  No reference genome found automatically.")
-        reference_fasta = _prompt_path("  Path to reference FASTA (or press Enter to skip)", must_exist=False)
+        reference_fasta = _prompt_path(
+            "  Path to reference FASTA (or press Enter to skip)", must_exist=False
+        )
         if not reference_fasta:
             reference_fasta = "EDIT_ME: /path/to/reference.fa"
     print()
@@ -510,9 +510,7 @@ def _interactive_wizard() -> None:
     vcf_suffix = _prompt("  vcf_suffix", default=".vcf.gz")
     final_output_name = _prompt("  final_output_name", default="all_merged.vcf.gz")
     print("  final_filter_logic:")
-    final_filter_logic = _prompt_choice(
-        "filter logic", choices=["x", "+"], default="x"
-    )
+    final_filter_logic = _prompt_choice("filter logic", choices=["x", "+"], default="x")
     print()
 
     # ---- Step 6: Summary + write ----

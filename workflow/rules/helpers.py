@@ -6,11 +6,12 @@ No Snakemake imports — functions are independently unit-testable.
 from __future__ import annotations
 
 import os
-
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # VCF list loading
 # ---------------------------------------------------------------------------
+
 
 def load_vcf_list(
     path: str,
@@ -24,11 +25,7 @@ def load_vcf_list(
     Raises ``ValueError`` if any two entries resolve to the same sample name.
     """
     with open(path) as fh:
-        paths = [
-            line.strip()
-            for line in fh
-            if line.strip() and not line.startswith("#")
-        ]
+        paths = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
     samples: list[str] = []
     sample_to_path: dict[str, str] = {}
@@ -37,8 +34,7 @@ def load_vcf_list(
         name = _strip_vcf_suffix(os.path.basename(p), suffix)
         if name in sample_to_path:
             raise ValueError(
-                f"Duplicate sample name '{name}' from files:\n"
-                f"  {sample_to_path[name]}\n  {p}"
+                f"Duplicate sample name '{name}' from files:\n  {sample_to_path[name]}\n  {p}"
             )
         samples.append(name)
         sample_to_path[name] = p
@@ -58,6 +54,7 @@ def _strip_vcf_suffix(basename: str, suffix: str) -> str:
 # ---------------------------------------------------------------------------
 # Batch arithmetic
 # ---------------------------------------------------------------------------
+
 
 def n_batches(total: int, batch_size: int) -> int:
     """Return the number of batches needed (ceiling division)."""
@@ -85,6 +82,7 @@ def get_batch_samples(
 # Resource helpers
 # ---------------------------------------------------------------------------
 
+
 def mem_mb(base_mb: int, max_mb: int = 128_000):
     """Return a Snakemake-compatible callable that doubles memory on each retry.
 
@@ -93,7 +91,8 @@ def mem_mb(base_mb: int, max_mb: int = 128_000):
         resources:
             mem_mb=mem_mb(4_000),
     """
-    def _mem(wildcards, attempt: int) -> int:  # noqa: ANN001
-        return min(base_mb * (2 ** (attempt - 1)), max_mb)
+
+    def _mem(wildcards: Any, attempt: int) -> int:
+        return int(min(base_mb * (2 ** (attempt - 1)), max_mb))
 
     return _mem

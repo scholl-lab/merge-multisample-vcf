@@ -16,12 +16,12 @@ from rules.helpers import (
 # Config extraction
 # ---------------------------------------------------------------------------
 
-VCF_LIST_FILE  = config["vcf_list_file"]
+VCF_LIST_FILE = config["vcf_list_file"]
 VCFS_PER_BATCH = int(config["vcfs_per_batch"])
-OUTPUT_FOLDER  = config["output_folder"]
+OUTPUT_FOLDER = config["output_folder"]
 REFERENCE_FASTA = config["reference_fasta"]
 
-VCF_SUFFIX        = config.get("vcf_suffix", ".vcf.gz")
+VCF_SUFFIX = config.get("vcf_suffix", ".vcf.gz")
 FINAL_OUTPUT_NAME = config.get("final_output_name", "all_merged.vcf.gz")
 FINAL_FILTER_LOGIC = config.get("final_filter_logic", "x")
 
@@ -45,12 +45,11 @@ SCRATCH_DIR = os.environ.get("TMPDIR", "/tmp")
 _p = lambda *parts: os.path.join(OUTPUT_FOLDER, *parts)  # noqa: E731
 
 NORMALIZED_DIR = _p("normalized_vcfs")
-MERGE_DIR      = _p("merged_vcfs")
-FINAL_DIR      = _p("final")
-LOG_DIR        = _p("logs")
+MERGE_DIR = _p("merged_vcfs")
+FINAL_DIR = _p("final")
+LOG_DIR = _p("logs")
 
-for _d in [NORMALIZED_DIR, MERGE_DIR, FINAL_DIR, LOG_DIR,
-           os.path.join(LOG_DIR, "benchmarks")]:
+for _d in [NORMALIZED_DIR, MERGE_DIR, FINAL_DIR, LOG_DIR, os.path.join(LOG_DIR, "benchmarks")]:
     os.makedirs(_d, exist_ok=True)
 
 
@@ -76,6 +75,7 @@ if _n > 1000:
 # ---------------------------------------------------------------------------
 # Input helper functions (used as lambdas in rule inputs)
 # ---------------------------------------------------------------------------
+
 
 def get_batch_vcfs(idx: int) -> list:
     """Normalized VCF paths for batch *idx*."""

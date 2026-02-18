@@ -14,11 +14,11 @@ Design notes
   The bcftools ~1021-file limit is validated at parse time in common.smk.
 """
 
-
 # ---------------------------------------------------------------------------
 # Rule: normalize_vcf
 # Fixes: B1 — index declared + produced; B3 — MD5 inline; T4 — pipefail
 # ---------------------------------------------------------------------------
+
 
 rule normalize_vcf:
     """Left-align, split multiallelic sites, and index each input VCF."""
@@ -32,7 +32,7 @@ rule normalize_vcf:
     log:
         os.path.join(LOG_DIR, "normalize_vcf.{sample}.log"),
     benchmark:
-        os.path.join(LOG_DIR, "benchmarks", "normalize_vcf.{sample}.tsv"),
+        os.path.join(LOG_DIR, "benchmarks", "normalize_vcf.{sample}.tsv")
     threads: 4
     resources:
         mem_mb=mem_mb(4_000),
@@ -63,6 +63,7 @@ rule normalize_vcf:
 # Removes: split_vcfs helper rule (batch membership computed via lambda)
 # ---------------------------------------------------------------------------
 
+
 rule merge_vcfs:
     """Merge one batch of normalised VCFs into a single multi-sample VCF.
 
@@ -79,7 +80,7 @@ rule merge_vcfs:
     log:
         os.path.join(LOG_DIR, "merge_vcfs.{idx}.log"),
     benchmark:
-        os.path.join(LOG_DIR, "benchmarks", "merge_vcfs.{idx}.tsv"),
+        os.path.join(LOG_DIR, "benchmarks", "merge_vcfs.{idx}.tsv")
     threads: 4
     resources:
         mem_mb=mem_mb(8_000),
@@ -116,6 +117,7 @@ rule merge_vcfs:
 # Removes: list_merged_vcfs helper rule (explicit expand keeps DAG correct)
 # ---------------------------------------------------------------------------
 
+
 rule final_merge:
     """Merge all batch VCFs into the final cohort-wide VCF."""
     input:
@@ -134,7 +136,7 @@ rule final_merge:
     log:
         os.path.join(LOG_DIR, "final_merge.log"),
     benchmark:
-        os.path.join(LOG_DIR, "benchmarks", "final_merge.tsv"),
+        os.path.join(LOG_DIR, "benchmarks", "final_merge.tsv")
     threads: 4
     resources:
         mem_mb=mem_mb(16_000),
