@@ -2,6 +2,32 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Dev tooling
+
+Install: `pip install ruff mypy snakefmt shellcheck-py pytest pytest-cov`
+
+| Command | Effect |
+|---------|--------|
+| `make lint` | Check Python (ruff), Snakemake (snakefmt), shell (shellcheck), types (mypy) |
+| `make format` | Auto-format all files |
+| `make fix` | Auto-fix lint + format |
+| `make test` | Run pytest |
+| `make install-dev` | Install all dev tools |
+
+Tool settings live in `pyproject.toml` (ruff, mypy, snakefmt, pytest).
+
+## Config generator
+
+```bash
+python scripts/generate_config.py                           # interactive wizard
+python scripts/generate_config.py --vcf-folder /data/vcfs  # scan directory
+python scripts/generate_config.py --vcf-list samples.list  # existing list
+python scripts/generate_config.py --vcf-folder /data/vcfs --dry-run
+```
+
+The script writes `input/input.list` (VCF paths) and `config/config.yaml`.
+All 8 config keys are settable via flags; run `--help` for full reference.
+
 ## Running the pipeline
 
 **Dry-run (always do this first):**
@@ -52,6 +78,7 @@ profiles/
 ├── charite/config.yaml        Charité HPC SLURM
 └── local/config.yaml          Local execution
 scripts/
+├── generate_config.py         Interactive/flag-based config generator
 └── run_snakemake.sh           Cluster-auto-detecting Slurm launcher
 deprecated/gatk/               Archived GATK pipeline (non-functional)
 .planning/PLAN.md              Implementation plan
