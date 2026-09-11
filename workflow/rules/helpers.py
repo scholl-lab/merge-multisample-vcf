@@ -34,8 +34,7 @@ def load_vcf_list(
 
     if not paths:
         raise ValueError(
-            f"VCF list file {path!r} contains no valid entries "
-            "(all lines are blank or comments)."
+            f"VCF list file {path!r} contains no valid entries (all lines are blank or comments)."
         )
 
     samples: list[str] = []

@@ -90,9 +90,9 @@ The pipeline has three rules, each fixing a specific biological concern:
 
 1. **`normalize_vcf`** — `bcftools norm` per sample: left-align indels, split multiallelic sites, produce bgzipped+tabix-indexed output. `temp()` output deleted after its batch merge completes.
 
-2. **`merge_vcfs`** — `bcftools merge | +fill-tags | view` for each batch of `vcfs_per_batch` samples. Batch membership computed by `get_batch_vcfs(idx)` / `get_batch_tbis(idx)` lambdas, so Snakemake has full DAG visibility and `temp()` cleanup is safe. `-m none` preserves the normalized representation.
+2. **`merge_vcfs`** — `bcftools merge | annotate -x 'INFO/F_MISSING' | +fill-tags | view` for each batch of `vcfs_per_batch` samples. Removing inherited missingness allows it to be recalculated without header conflicts. Batch membership computed by `get_batch_vcfs(idx)` / `get_batch_tbis(idx)` lambdas, so Snakemake has full DAG visibility and `temp()` cleanup is safe. `-m none` preserves the normalized representation.
 
-3. **`final_merge`** — same `bcftools merge | +fill-tags | view` pipeline over all batch VCFs. `expand()` over `BATCH_INDICES` ensures explicit dependency tracking.
+3. **`final_merge`** — same `bcftools merge | annotate -x 'INFO/F_MISSING' | +fill-tags | view` pipeline over all batch VCFs. `expand()` over `BATCH_INDICES` ensures explicit dependency tracking.
 
 **Key design decisions:**
 - No list-file helper rules (`split_vcfs`, `list_merged_vcfs` from legacy pipeline). Explicit Snakemake inputs replace them, enabling safe `temp()`.
