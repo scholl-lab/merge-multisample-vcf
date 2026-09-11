@@ -102,6 +102,7 @@ rule merge_vcfs:
             -0 -m none \
             -i {params.info_rules:q} \
             {input.vcfs} \
+          | bcftools annotate -x 'INFO/F_MISSING' \
           | bcftools +fill-tags \
           | bcftools view --threads {threads} -Oz -o {output.vcf} -W=tbi
         ) >> {log} 2>&1
@@ -158,6 +159,7 @@ rule final_merge:
             -0 -m none \
             -i {params.info_rules:q} \
             {input.vcfs} \
+          | bcftools annotate -x 'INFO/F_MISSING' \
           | bcftools +fill-tags \
           | bcftools view --threads {threads} -Oz -o {output.vcf} -W=tbi
         ) >> {log} 2>&1

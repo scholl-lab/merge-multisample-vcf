@@ -1,0 +1,30 @@
+{
+  "title": "merge-multisample-vcf",
+  "description": "Snakemake workflow for normalizing and merging large multi-sample VCF cohorts with bcftools. Two-stage batching merges normalized inputs into batch VCFs and then a cohort-wide VCF, with recalculated variant annotations, tabix indexes, and MD5 checksums.",
+  "upload_type": "software",
+  "access_right": "open",
+  "license": "MIT",
+  "version": "0.2.0",
+  "publication_date": "2026-02-18",
+  "creators": [
+    {
+      "name": "Popp, Bernt",
+      "orcid": "0000-0002-3679-1081",
+      "affiliation": "Berlin Institute of Health at Charité – Universitätsmedizin Berlin, Center of Functional Genomics, Berlin, Germany; Labor Berlin – Charité Vivantes GmbH, Berlin, Germany"
+    }
+  ],
+  "keywords": [
+    "VCF",
+    "bcftools",
+    "Snakemake",
+    "variant merging",
+    "bioinformatics"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/scholl-lab/merge-multisample-vcf",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}
