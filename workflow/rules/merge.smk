@@ -99,7 +99,7 @@ rule merge_vcfs:
           bcftools merge \
             --threads {threads} \
             -F {params.filter_logic} \
-            -0 -m none \
+            --force-single -m none \
             -i {params.info_rules:q} \
             {input.vcfs} \
           | bcftools annotate -x 'INFO/F_MISSING' \
@@ -156,7 +156,7 @@ rule final_merge:
           bcftools merge \
             --threads {threads} \
             -F {params.filter_logic} \
-            -0 -m none \
+            --force-single -m none \
             -i {params.info_rules:q} \
             {input.vcfs} \
           | bcftools annotate -x 'INFO/F_MISSING' \
