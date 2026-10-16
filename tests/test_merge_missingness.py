@@ -34,12 +34,14 @@ def test_merge_recomputes_missingness_from_genotypes(tmp_path, rule, tag_number)
     info = "F_MISSING=0.9" if tag_number else "."
     inputs = []
     for sample, genotype in [("sample_a", "./."), ("sample_b", "0/1")]:
+        extra = f"1\t30\t.\tT\tA\t.\tPASS\t{info}\tGT\t0/1\n" if sample == "sample_b" else ""
         vcf = tmp_path / f"{sample}.vcf"
         vcf.write_text(
             header
             + f"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t{sample}\n"
             + f"1\t10\t.\tA\tC\t.\tPASS\t{info}\tGT\t{genotype}\n"
-            + f"1\t20\t.\tG\tT\t.\tPASS\t{info}\tGT\t0/1\n",
+            + f"1\t20\t.\tG\tT\t.\tPASS\t{info}\tGT\t0/1\n"
+            + extra,
             encoding="utf-8",
         )
         compressed = vcf.with_suffix(".vcf.gz")
@@ -74,6 +76,6 @@ def test_merge_recomputes_missingness_from_genotypes(tmp_path, rule, tag_number)
         ["bcftools", "query", "-f", "%POS\t%INFO/F_MISSING[\t%GT]\n", str(output)],
         text=True,
     ).splitlines()
-    assert rows == ["10\t0.5\t./.\t0/1", "20\t0\t0/1\t0/1"]
+    assert rows == ["10\t0.5\t./.\t0/1", "20\t0\t0/1\t0/1", "30\t0.5\t./.\t0/1"]
     assert output.with_suffix(".gz.tbi").is_file()
     assert checksum.read_text().split()[0] == hashlib.md5(output.read_bytes()).hexdigest()
