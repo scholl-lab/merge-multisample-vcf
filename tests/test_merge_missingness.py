@@ -79,3 +79,45 @@ def test_merge_recomputes_missingness_from_genotypes(tmp_path, rule, tag_number)
     assert rows == ["10\t0.5\t./.\t0/1", "20\t0\t0/1\t0/1", "30\t0.5\t./.\t0/1"]
     assert output.with_suffix(".gz.tbi").is_file()
     assert checksum.read_text().split()[0] == hashlib.md5(output.read_bytes()).hexdigest()
+
+
+@pytest.mark.parametrize("rule", ["merge_vcfs", "final_merge"])
+def test_merge_single_input_vcf(tmp_path, rule):
+    """Single-sample batch and single-batch final_merge must succeed via --force-single."""
+    vcf = tmp_path / "sample_a.vcf"
+    vcf.write_text(
+        "##fileformat=VCFv4.2\n"
+        "##contig=<ID=1,length=100>\n"
+        '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+        "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tsample_a\n"
+        "1\t10\t.\tA\tC\t.\tPASS\t.\tGT\t0/1\n",
+        encoding="utf-8",
+    )
+    compressed = vcf.with_suffix(".vcf.gz")
+    subprocess.run(
+        ["bcftools", "view", "-Oz", "-o", str(compressed), "-W=tbi", str(vcf)],
+        check=True,
+    )
+
+    source = (Path(__file__).parents[1] / "workflow/rules/merge.smk").read_text(encoding="utf-8")
+    block = re.search(rf"rule {rule}:.*?shell:\s*r\"\"\"(.*?)\"\"\"", source, re.S)
+    assert block is not None
+    output = tmp_path / "merged.vcf.gz"
+    checksum = tmp_path / "merged.vcf.gz.md5"
+    log = tmp_path / "merge.log"
+    command = (
+        block[1]
+        .replace("{params.info_rules:q}", "'-'")
+        .format(
+            threads=1,
+            params=SimpleNamespace(filter_logic="x"),
+            input=SimpleNamespace(vcfs=shlex.quote(str(compressed))),
+            output=SimpleNamespace(vcf=shlex.quote(str(output)), md5=shlex.quote(str(checksum))),
+            wildcards=SimpleNamespace(idx=0),
+            log=shlex.quote(str(log)),
+        )
+    )
+    result = subprocess.run(["bash", "-c", command], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr + log.read_text(encoding="utf-8")
+    assert output.with_suffix(".gz.tbi").is_file()
+    assert checksum.read_text().split()[0] == hashlib.md5(output.read_bytes()).hexdigest()
