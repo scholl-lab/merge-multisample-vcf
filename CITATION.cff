@@ -3,8 +3,8 @@ message: If you use merge-multisample-vcf in your research, please cite this sof
 type: software
 title: merge-multisample-vcf
 abstract: Snakemake workflow for normalizing and merging large multi-sample VCF cohorts with bcftools. Two-stage batching merges normalized inputs into batch VCFs and then a cohort-wide VCF, with recalculated variant annotations, tabix indexes, and MD5 checksums.
-version: 0.2.0
-date-released: '2026-02-18'
+version: 0.3.0
+date-released: '2026-10-16'
 url: https://github.com/scholl-lab/merge-multisample-vcf
 repository-code: https://github.com/scholl-lab/merge-multisample-vcf
 license: MIT

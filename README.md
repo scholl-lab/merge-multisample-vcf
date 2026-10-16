@@ -94,8 +94,8 @@ This project is available under the [MIT License](LICENSE).
 
 Use [CITATION.cff](CITATION.cff), or GitHub's **Cite this repository** action,
 to cite the software. Record the release tag or commit used for your analysis.
-The citation metadata currently describes the existing `v0.2.0` release
-(2026-02-18); changes on the development branch are unreleased.
+The citation metadata currently describes the existing `v0.3.0` release
+(2026-10-16); changes on the development branch are unreleased.
 
 [.zenodo.json](.zenodo.json) supplies matching archive metadata. No Zenodo DOI
 has been minted for this repository yet. A maintainer must enable the Zenodo
